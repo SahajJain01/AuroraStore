@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -27,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewWrapper
 import com.aurora.store.R
+import com.aurora.store.compose.composable.tvFocusRing
 import com.aurora.store.compose.preview.ThemePreviewProvider
 import com.aurora.store.data.model.DownloadStatus
 import com.aurora.store.data.room.download.Download
@@ -52,10 +54,12 @@ fun AppUpdateItem(
     } else {
         0f
     }
+    val focusShape = RoundedCornerShape(dimensionResource(R.dimen.radius_medium))
 
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .tvFocusRing(focusShape)
             .clickable(onClick = onClick)
             .padding(
                 horizontal = dimensionResource(R.dimen.spacing_medium),

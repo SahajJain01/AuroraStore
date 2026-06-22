@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,12 +43,15 @@ fun AuroraListItem(
     trailing: (@Composable () -> Unit)? = null,
     headlineStyle: TextStyle = MaterialTheme.typography.bodyLarge
 ) {
+    val focusShape = RoundedCornerShape(dimensionResource(R.dimen.radius_medium))
     Row(
         modifier = modifier
             .fillMaxWidth()
             .then(
                 if (onClick != null) {
-                    Modifier.clickable(enabled = enabled, onClick = onClick)
+                    Modifier
+                        .tvFocusRing(focusShape)
+                        .clickable(enabled = enabled, onClick = onClick)
                 } else {
                     Modifier
                 }

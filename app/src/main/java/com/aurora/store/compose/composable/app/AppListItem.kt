@@ -27,11 +27,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewWrapper
+import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
 import com.aurora.gplayapi.data.models.App
 import com.aurora.store.R
+import com.aurora.store.compose.composable.tvFocusRing
+import com.aurora.store.compose.composition.LocalUI
+import com.aurora.store.compose.composition.UI
 import com.aurora.store.compose.preview.AppPreviewProvider
 import com.aurora.store.compose.preview.ThemePreviewProvider
 
@@ -44,9 +48,13 @@ import com.aurora.store.compose.preview.ThemePreviewProvider
  */
 @Composable
 fun AppListItem(modifier: Modifier = Modifier, app: App, onClick: () -> Unit = {}) {
+    val isTv = LocalUI.current == UI.TV
+    val itemWidth = if (isTv) 132.dp else dimensionResource(R.dimen.icon_size_cluster)
+    val focusShape = RoundedCornerShape(dimensionResource(R.dimen.radius_medium))
     Column(
         modifier = modifier
-            .width(dimensionResource(R.dimen.icon_size_cluster))
+            .width(itemWidth)
+            .tvFocusRing(focusShape, focusedScale = 1.06f)
             .clickable(onClick = onClick)
             .padding(all = dimensionResource(R.dimen.spacing_xsmall)),
         horizontalAlignment = Alignment.CenterHorizontally,
