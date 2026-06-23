@@ -62,6 +62,7 @@ class ComposeActivity : FragmentActivity() {
         val startDestination = resolveStartDestination()
 
         val localUI = when {
+            BuildConfig.FORCE_TV_UI -> UI.TV
             PackageUtil.isTv(this) -> UI.TV
             else -> UI.DEFAULT
         }

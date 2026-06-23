@@ -74,6 +74,7 @@ configure<ApplicationExtension> {
 
         buildConfigField("String", "EXODUS_API_KEY", "\"bbe6ebae4ad45a9cbacb17d69739799b8df2c7ae\"")
         buildConfigField("long", "BUILD_TIMESTAMP", "${lastCommitTimestamp.get()}L")
+        buildConfigField("Boolean", "FORCE_TV_UI", "false")
 
         missingDimensionStrategy("device", "vanilla")
     }
@@ -132,6 +133,14 @@ configure<ApplicationExtension> {
         create("vanilla") {
             isDefault = true
             dimension = "device"
+            buildConfigField("Boolean", "SHOW_ANONYMOUS_LOGIN", "true")
+        }
+
+        create("tv") {
+            dimension = "device"
+            applicationIdSuffix = ".tv"
+            versionNameSuffix = "-tv"
+            buildConfigField("Boolean", "FORCE_TV_UI", "true")
             buildConfigField("Boolean", "SHOW_ANONYMOUS_LOGIN", "true")
         }
 
