@@ -26,6 +26,7 @@ import com.aurora.gplayapi.helpers.contracts.TopChartsContract
 import com.aurora.gplayapi.helpers.web.WebTopChartsHelper
 import com.aurora.store.TopChartStash
 import com.aurora.store.data.model.ViewState
+import com.aurora.store.util.tvOptimizedFirst
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -93,7 +94,8 @@ class TopChartViewModel @Inject constructor(
         val streamCluster = targetCluster(type, chart)
         val mergedCluster = streamCluster.copy(
             clusterNextPageUrl = newCluster.clusterNextPageUrl,
-            clusterAppList = streamCluster.clusterAppList + newCluster.clusterAppList
+            clusterAppList = (streamCluster.clusterAppList + newCluster.clusterAppList)
+                .tvOptimizedFirst()
         )
 
         stash[type]?.set(chart, mergedCluster)

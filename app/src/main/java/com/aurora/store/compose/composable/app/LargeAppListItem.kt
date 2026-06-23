@@ -28,6 +28,7 @@ import com.aurora.store.compose.composable.AuroraListItem
 import com.aurora.store.compose.preview.AppPreviewProvider
 import com.aurora.store.compose.preview.ThemePreviewProvider
 import com.aurora.store.util.CommonUtil
+import com.aurora.store.util.TvAppRanker
 
 @Composable
 fun LargeAppListItem(modifier: Modifier = Modifier, app: App, onClick: () -> Unit = {}) {
@@ -56,6 +57,7 @@ fun LargeAppListItem(modifier: Modifier = Modifier, app: App, onClick: () -> Uni
 
 @Composable
 private fun buildAppExtras(app: App): String = buildList {
+    if (TvAppRanker.isTvOptimized(app)) add("TV")
     add(if (app.size > 0) CommonUtil.addSiPrefix(app.size) else app.downloadString)
     add("${app.labeledRating}★")
     add(stringResource(if (app.isFree) R.string.details_free else R.string.details_paid))

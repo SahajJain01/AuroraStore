@@ -48,6 +48,7 @@ import com.aurora.store.util.CertUtil
 import com.aurora.store.util.PackageUtil
 import com.aurora.store.util.Preferences
 import com.aurora.store.util.Preferences.PREFERENCE_UPDATES_EXTENDED
+import com.aurora.store.util.tvOptimizedFirst
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -442,6 +443,8 @@ class AppDetailsViewModel @Inject constructor(
                 val pageBundle = appDetailsHelper.getDetailsStream(streamUrl.hashCode(), streamUrl)
                 val pageClusters = pageBundle.streamClusters.filterValues {
                     it.clusterTitle.isNotBlank() && it.clusterAppList.isNotEmpty()
+                }.mapValues { (_, cluster) ->
+                    cluster.tvOptimizedFirst()
                 }
                 suggestionsState = pageBundle.copy(streamClusters = pageClusters)
                 _suggestionsBundle.value = suggestionsState
@@ -463,7 +466,8 @@ class AppDetailsViewModel @Inject constructor(
                 )
                 val existing = suggestionsState.streamClusters[cluster.id] ?: return@launch
                 val mergedCluster = existing.copy(
-                    clusterAppList = existing.clusterAppList + nextPage.clusterAppList,
+                    clusterAppList = (existing.clusterAppList + nextPage.clusterAppList)
+                        .tvOptimizedFirst(),
                     clusterNextPageUrl = nextPage.clusterNextPageUrl
                 )
                 suggestionsState = suggestionsState.copy(

@@ -30,6 +30,7 @@ import com.aurora.gplayapi.helpers.contracts.StreamContract
 import com.aurora.gplayapi.helpers.web.WebStreamHelper
 import com.aurora.store.HomeStash
 import com.aurora.store.data.model.ViewState
+import com.aurora.store.util.tvOptimizedFirst
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -81,7 +82,8 @@ class StreamViewModel @Inject constructor(
                         }
 
                         val mergedBundle = bundle.copy(
-                            streamClusters = bundle.streamClusters + newBundle.streamClusters,
+                            streamClusters = (bundle.streamClusters + newBundle.streamClusters)
+                                .mapValues { (_, cluster) -> cluster.tvOptimizedFirst() },
                             streamNextPageUrl = newBundle.streamNextPageUrl
                         )
                         stash[category] = mergedBundle
@@ -135,7 +137,8 @@ class StreamViewModel @Inject constructor(
 
         val mergedCluster = oldCluster.copy(
             clusterNextPageUrl = newCluster.clusterNextPageUrl,
-            clusterAppList = oldCluster.clusterAppList + newCluster.clusterAppList
+            clusterAppList = (oldCluster.clusterAppList + newCluster.clusterAppList)
+                .tvOptimizedFirst()
         )
 
         val updatedClusters = bundle.streamClusters.toMutableMap().apply {

@@ -16,6 +16,7 @@ import com.aurora.gplayapi.helpers.contracts.CategoryStreamContract
 import com.aurora.gplayapi.helpers.contracts.StreamContract
 import com.aurora.gplayapi.helpers.web.WebCategoryStreamHelper
 import com.aurora.store.data.model.ViewState
+import com.aurora.store.util.tvOptimizedFirst
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -64,7 +65,8 @@ class CategoryStreamViewModel @AssistedInject constructor(
                     }
 
                     streamBundle = streamBundle.copy(
-                        streamClusters = streamBundle.streamClusters + newBundle.streamClusters,
+                        streamClusters = (streamBundle.streamClusters + newBundle.streamClusters)
+                            .mapValues { (_, cluster) -> cluster.tvOptimizedFirst() },
                         streamNextPageUrl = newBundle.streamNextPageUrl
                     )
 
@@ -88,8 +90,8 @@ class CategoryStreamViewModel @AssistedInject constructor(
                     )
                     val mergedCluster = streamCluster.copy(
                         clusterNextPageUrl = newCluster.clusterNextPageUrl,
-                        clusterAppList =
-                        streamCluster.clusterAppList + newCluster.clusterAppList
+                        clusterAppList = (streamCluster.clusterAppList + newCluster.clusterAppList)
+                            .tvOptimizedFirst()
                     )
 
                     val newClusters = streamBundle.streamClusters.toMutableMap().apply {

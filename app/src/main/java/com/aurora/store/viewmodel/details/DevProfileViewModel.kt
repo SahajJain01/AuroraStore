@@ -34,6 +34,7 @@ import com.aurora.gplayapi.helpers.contracts.StreamContract
 import com.aurora.store.AuroraApp
 import com.aurora.store.data.event.AuthEvent
 import com.aurora.store.data.model.ViewState
+import com.aurora.store.util.tvOptimizedFirst
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -56,7 +57,12 @@ class DevProfileViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 devStream = appDetailsHelper.getDeveloperStream(devId)
-                streamBundle = devStream.streamBundle
+                streamBundle = devStream.streamBundle.copy(
+                    streamClusters = devStream.streamBundle.streamClusters.mapValues {
+                        it.value.tvOptimizedFirst()
+                    }
+                )
+                devStream = devStream.copy(streamBundle = streamBundle)
                 liveData.postValue(ViewState.Success(devStream))
             } catch (e: GooglePlayException.AuthException) {
                 Log.w(TAG, "Developer stream fetch returned ${e.code}, redirecting to Splash")
@@ -91,7 +97,8 @@ class DevProfileViewModel @Inject constructor(
         streamBundle.streamClusters[newCluster.id]?.let { oldCluster ->
             val mergedCluster = oldCluster.copy(
                 clusterNextPageUrl = newCluster.clusterNextPageUrl,
-                clusterAppList = oldCluster.clusterAppList + newCluster.clusterAppList
+                clusterAppList = (oldCluster.clusterAppList + newCluster.clusterAppList)
+                    .tvOptimizedFirst()
             )
 
             val newStreamClusters = streamBundle.streamClusters.toMutableMap().apply {

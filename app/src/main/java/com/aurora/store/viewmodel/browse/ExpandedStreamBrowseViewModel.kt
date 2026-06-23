@@ -19,6 +19,7 @@ import com.aurora.store.AuroraApp
 import com.aurora.store.data.PageResult
 import com.aurora.store.data.event.AuthEvent
 import com.aurora.store.data.paging.GenericPagingSource.Companion.manualPager
+import com.aurora.store.util.tvOptimizedFirst
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -91,7 +92,7 @@ class ExpandedStreamBrowseViewModel @AssistedInject constructor(
                 AuroraApp.events.send(AuthEvent.SessionExpired())
                 emptyList()
             }
-            PageResult(items)
+            PageResult(items.tvOptimizedFirst())
         }.flow.distinctUntilChanged()
             .cachedIn(viewModelScope)
             .onEach { _apps.value = it }

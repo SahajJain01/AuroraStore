@@ -27,6 +27,7 @@ import com.aurora.store.data.event.AuthEvent
 import com.aurora.store.data.model.SearchFilter
 import com.aurora.store.data.paging.GenericPagingSource.Companion.manualPager
 import com.aurora.store.data.providers.AuthProvider
+import com.aurora.store.util.tvOptimizedFirst
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -114,7 +115,7 @@ class SearchViewModel @Inject constructor(
                 AuroraApp.events.send(AuthEvent.SessionExpired())
                 emptyList()
             }
-            PageResult(items)
+            PageResult(items.tvOptimizedFirst())
         }.flow.distinctUntilChanged()
             .cachedIn(viewModelScope)
             .onEach { _apps.value = it }
