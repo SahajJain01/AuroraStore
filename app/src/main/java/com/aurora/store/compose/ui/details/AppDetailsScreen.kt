@@ -13,15 +13,28 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.WindowAdaptiveInfo
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.layout.AdaptStrategy
@@ -45,10 +58,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.compose.ui.tooling.preview.PreviewWrapper
+import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -74,6 +90,9 @@ import com.aurora.store.compose.composable.SectionHeader
 import com.aurora.store.compose.composable.ShimmerCarouselSection
 import com.aurora.store.compose.composable.StreamCarousel
 import com.aurora.store.compose.composable.TopAppBar
+import com.aurora.store.compose.composable.app.AnimatedAppIcon
+import com.aurora.store.compose.composition.LocalUI
+import com.aurora.store.compose.composition.UI
 import com.aurora.store.compose.navigation.Destination
 import com.aurora.store.compose.navigation.Screen
 import com.aurora.store.compose.preview.AppPreviewProvider
@@ -106,6 +125,7 @@ import com.aurora.store.data.model.Scores
 import com.aurora.store.data.providers.PermissionProvider.Companion.isGranted
 import com.aurora.store.data.providers.PermissionProvider.Companion.isPermittedToInstall
 import com.aurora.store.data.room.account.Account
+import com.aurora.store.util.CommonUtil
 import com.aurora.store.util.FlavouredUtil
 import com.aurora.store.util.PackageUtil
 import com.aurora.store.util.ShortcutManagerUtil
@@ -121,6 +141,7 @@ fun AppDetailsScreen(
     forceSinglePane: Boolean = false
 ) {
     val context = LocalContext.current
+    val isTv = LocalUI.current == UI.TV
 
     val app by viewModel.app.collectAsStateWithLifecycle()
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -216,7 +237,7 @@ fun AppDetailsScreen(
                         )
                     },
                     onDeleteReview = { viewModel.deleteAppReview(loadedApp) },
-                    forceSinglePane = forceSinglePane,
+                    forceSinglePane = forceSinglePane || isTv,
                     onForceRestart = {
                         val intent = Intent(context, ComposeActivity::class.java)
                             .putExtra("packageName", packageName)
@@ -312,6 +333,7 @@ private fun ScreenContentApp(
     onForceRestart: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val isTv = LocalUI.current == UI.TV
 
     // Anonymous accounts can't purchase, so a paid app can neither be installed nor manually
     // downloaded (any version) by them. Free apps are always acquirable.
@@ -650,6 +672,158 @@ private fun ScreenContentApp(
     }
 
     @Composable
+    fun TvMainPane() {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    actions = { if (shouldShowMenuOnMainPane) SetupMenu() }
+                )
+            }
+        ) { paddingValues ->
+            val listState = rememberLazyListState()
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    state = listState,
+                    contentPadding = PaddingValues(
+                        start = 24.dp,
+                        end = 24.dp,
+                        bottom = 64.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(24.dp)
+                ) {
+                    item(key = "tv-hero") {
+                        TvDetailsHero(
+                            app = app,
+                            state = state,
+                            onNavigateToDetailsDevProfile = {
+                                showExtraPane(Screen.DevProfile(it))
+                            },
+                            actions = { SetupActions() }
+                        )
+                    }
+
+                    if (app.screenshots.isNotEmpty()) {
+                        item(key = "tv-screenshots-header") {
+                            SectionHeader(
+                                title = stringResource(R.string.details_more_about_app),
+                                subtitle = app.shortDescription,
+                                onClick = { showExtraPane(ExtraScreen.More) }
+                            )
+                        }
+
+                        item(key = "tv-screenshots") {
+                            Screenshots(
+                                screenshots = app.screenshots,
+                                onNavigateToScreenshot = {
+                                    showExtraPane(ExtraScreen.Screenshot(it))
+                                }
+                            )
+                        }
+                    }
+
+                    item(key = "tv-changelog") {
+                        Changelog(changelog = app.changes)
+                    }
+
+                    item(key = "tv-rating") {
+                        RatingAndReviews(
+                            rating = app.rating,
+                            featuredReviews = featuredReviews,
+                            onNavigateToDetailsReview = { showExtraPane(ExtraScreen.Review) }
+                        )
+                    }
+
+                    item(key = "tv-user-review") {
+                        if (!isAnonymous && app.isInstalled) {
+                            UserReview(
+                                review = userReview,
+                                onSubmit = onSubmitReview,
+                                onDelete = onDeleteReview
+                            )
+                        }
+                    }
+
+                    item(key = "tv-testing") {
+                        if (!isAnonymous && app.testingProgram?.isAvailable == true) {
+                            Testing(
+                                isSubscribed = app.testingProgram!!.isSubscribed,
+                                onTestingSubscriptionChange = onTestingSubscriptionChange
+                            )
+                        }
+                    }
+
+                    item(key = "tv-compatibility") {
+                        Compatibility(needsGms = app.requiresGMS(), plexusScores = plexusScores)
+                    }
+
+                    item(key = "tv-permissions") {
+                        SectionHeader(
+                            title = stringResource(R.string.details_permission),
+                            subtitle = if (app.permissions.isNotEmpty()) {
+                                stringResource(R.string.permissions_requested, app.permissions.size)
+                            } else {
+                                stringResource(R.string.details_no_permission)
+                            },
+                            onClick = if (app.permissions.isNotEmpty()) {
+                                { showExtraPane(ExtraScreen.Permission) }
+                            } else {
+                                null
+                            }
+                        )
+                    }
+
+                    item(key = "tv-data-safety") {
+                        if (dataSafetyReport != null) {
+                            DataSafety(
+                                report = dataSafetyReport,
+                                privacyPolicyUrl = app.privacyPolicyUrl
+                            )
+                        }
+                    }
+
+                    item(key = "tv-privacy") {
+                        Privacy(
+                            report = exodusReport,
+                            onNavigateToDetailsExodus = if (exodusReport != null &&
+                                exodusReport.id != -1
+                            ) {
+                                { showExtraPane(ExtraScreen.Exodus) }
+                            } else {
+                                null
+                            }
+                        )
+                    }
+
+                    item(key = "tv-developer") {
+                        DeveloperDetails(
+                            address = app.developerAddress,
+                            website = app.developerWebsite,
+                            email = app.developerEmail
+                        )
+                    }
+
+                    if (shouldShowMenuOnMainPane) {
+                        suggestionClusterItems(
+                            suggestionsBundle = suggestionsBundle,
+                            onAppClick = { onNavigateTo(Destination.AppDetails(it.packageName)) },
+                            onClusterScrolled = onLoadMoreCluster
+                        )
+                    }
+                }
+                ScrollHint(
+                    listState = listState,
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
+            }
+        }
+    }
+
+    @Composable
     fun SupportingPane() {
         Scaffold(
             topBar = {
@@ -730,7 +904,7 @@ private fun ScreenContentApp(
 
     NavigableSupportingPaneScaffold(
         navigator = scaffoldNavigator,
-        mainPane = { AnimatedPane { MainPane() } },
+        mainPane = { AnimatedPane { if (isTv) TvMainPane() else MainPane() } },
         supportingPane = { AnimatedPane { SupportingPane() } },
         extraPane = {
             scaffoldNavigator.currentDestination?.contentKey?.let { screen ->
@@ -739,6 +913,105 @@ private fun ScreenContentApp(
         }
     )
 }
+
+@Composable
+private fun TvDetailsHero(
+    app: App,
+    state: AppState,
+    onNavigateToDetailsDevProfile: (developerName: String) -> Unit,
+    actions: @Composable () -> Unit
+) {
+    val versionName = if (state is AppState.Installed) state.versionName else app.versionName
+    val versionCode = if (state is AppState.Installed) state.versionCode else app.versionCode
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(28.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AnimatedAppIcon(
+                modifier = Modifier.requiredSize(120.dp),
+                iconUrl = app.iconArtwork.url,
+                inProgress = state.inProgress(),
+                progress = state.progress()
+            )
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = app.displayName,
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    modifier = Modifier.clickable {
+                        onNavigateToDetailsDevProfile(app.developerName)
+                    },
+                    text = app.developerName,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = stringResource(R.string.version, versionName, versionCode),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                Spacer(Modifier.height(12.dp))
+                actions()
+            }
+
+            Column(
+                modifier = Modifier.width(260.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    text = tvDetailsMeta(app),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = app.shortDescription.ifBlank { app.description },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun tvDetailsMeta(app: App): String = buildList {
+    add("${app.labeledRating}*")
+    add(if (app.size > 0) CommonUtil.addSiPrefix(app.size) else app.downloadString)
+    add(stringResource(if (app.isFree) R.string.details_free else R.string.details_paid))
+    add(
+        stringResource(
+            if (app.containsAds) R.string.details_contains_ads else R.string.details_no_ads
+        )
+    )
+    if (app.requiresGMS()) add(stringResource(R.string.details_gsf_dependent))
+}.filter { it.isNotBlank() }.joinToString(separator = "  /  ")
 
 /**
  * Renders the suggestion stream as cluster rows inside the parent [LazyColumn].

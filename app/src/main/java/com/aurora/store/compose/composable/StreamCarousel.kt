@@ -25,12 +25,15 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewWrapper
+import androidx.compose.ui.unit.dp
 import com.aurora.gplayapi.data.models.App
 import com.aurora.gplayapi.data.models.StreamBundle
 import com.aurora.gplayapi.data.models.StreamCluster
 import com.aurora.store.R
 import com.aurora.store.compose.composable.app.AppListItem
 import com.aurora.store.compose.composable.app.LargeAppListItem
+import com.aurora.store.compose.composition.LocalUI
+import com.aurora.store.compose.composition.UI
 import com.aurora.store.compose.preview.ThemePreviewProvider
 import kotlinx.coroutines.flow.distinctUntilChanged
 
@@ -140,6 +143,7 @@ internal fun ClusterRow(
     onAppClick: (App) -> Unit = {},
     onClusterScrolled: (StreamCluster) -> Unit = {}
 ) {
+    val isTv = LocalUI.current == UI.TV
     val rowState = rememberLazyListState()
     val reachedEnd by remember {
         derivedStateOf {
@@ -155,7 +159,10 @@ internal fun ClusterRow(
 
     LazyRow(
         state = rowState,
-        contentPadding = PaddingValues(horizontal = dimensionResource(R.dimen.spacing_small)),
+        contentPadding = PaddingValues(
+            horizontal = dimensionResource(R.dimen.spacing_small),
+            vertical = if (isTv) 10.dp else 0.dp
+        ),
         horizontalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.spacing_small))
     ) {
         itemsIndexed(

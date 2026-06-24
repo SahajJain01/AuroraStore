@@ -21,10 +21,13 @@ import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewWrapper
+import androidx.compose.ui.unit.dp
 import com.aurora.gplayapi.data.models.App
 import com.aurora.gplayapi.data.models.Artwork
 import com.aurora.store.R
 import com.aurora.store.compose.composable.details.ScreenshotListItem
+import com.aurora.store.compose.composition.LocalUI
+import com.aurora.store.compose.composition.UI
 import com.aurora.store.compose.preview.AppPreviewProvider
 import com.aurora.store.compose.preview.ThemePreviewProvider
 
@@ -36,6 +39,12 @@ import com.aurora.store.compose.preview.ThemePreviewProvider
  */
 @Composable
 fun Screenshots(screenshots: List<Artwork>, onNavigateToScreenshot: (index: Int) -> Unit = {}) {
+    val screenshotHeight = if (LocalUI.current == UI.TV) {
+        140.dp
+    } else {
+        dimensionResource(R.dimen.screenshot_height)
+    }
+
     LazyRow(
         contentPadding = PaddingValues(horizontal = dimensionResource(R.dimen.spacing_medium)),
         horizontalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.spacing_small))
@@ -43,7 +52,7 @@ fun Screenshots(screenshots: List<Artwork>, onNavigateToScreenshot: (index: Int)
         items(items = screenshots, key = { artwork -> artwork.url }) { artwork ->
             ScreenshotListItem(
                 modifier = Modifier
-                    .height(dimensionResource(R.dimen.screenshot_height))
+                    .height(screenshotHeight)
                     .clip(RoundedCornerShape(dimensionResource(R.dimen.radius_small)))
                     .clickable { onNavigateToScreenshot(screenshots.indexOf(artwork)) },
                 url = "${artwork.url}=rw-w480-v1-e15"

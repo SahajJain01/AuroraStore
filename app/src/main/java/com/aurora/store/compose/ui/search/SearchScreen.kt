@@ -34,8 +34,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.adaptive.WindowAdaptiveInfo
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.layout.AnimatedPane
 import androidx.compose.material3.adaptive.layout.ListDetailPaneScaffoldRole
+import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.material3.adaptive.navigation.NavigableListDetailPaneScaffold
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.material3.rememberSearchBarState
@@ -78,6 +81,8 @@ import com.aurora.store.compose.composable.Placeholder
 import com.aurora.store.compose.composable.ScrollHint
 import com.aurora.store.compose.composable.SearchSuggestionListItem
 import com.aurora.store.compose.composable.app.LargeAppListItem
+import com.aurora.store.compose.composition.LocalUI
+import com.aurora.store.compose.composition.UI
 import com.aurora.store.compose.navigation.Destination
 import com.aurora.store.compose.preview.AppPreviewProvider
 import com.aurora.store.compose.preview.ThemePreviewProvider
@@ -117,7 +122,8 @@ private fun ScreenContent(
     onFetchSuggestions: (String) -> Unit = {},
     onSearch: (String) -> Unit = {},
     onFilter: (filter: SearchFilter) -> Unit = {},
-    isAnonymous: Boolean = true
+    isAnonymous: Boolean = true,
+    windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfoV2()
 ) {
     val activity = LocalActivity.current as? ComponentActivity
     val textFieldState = rememberTextFieldState()
@@ -125,7 +131,16 @@ private fun ScreenContent(
     var isSearching by rememberSaveable { mutableStateOf(false) }
 
     val focusRequester = remember { FocusRequester() }
-    val scaffoldNavigator = rememberListDetailPaneScaffoldNavigator<String>()
+    val isTv = LocalUI.current == UI.TV
+    var scaffoldDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo)
+
+    if (isTv) {
+        scaffoldDirective = scaffoldDirective.copy(maxHorizontalPartitions = 1)
+    }
+
+    val scaffoldNavigator = rememberListDetailPaneScaffoldNavigator<String>(
+        scaffoldDirective = scaffoldDirective
+    )
     val coroutineScope = rememberCoroutineScope()
 
     val focusManager = LocalFocusManager.current

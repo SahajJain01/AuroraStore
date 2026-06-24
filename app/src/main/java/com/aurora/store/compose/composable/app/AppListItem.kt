@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -50,11 +51,14 @@ import com.aurora.store.compose.preview.ThemePreviewProvider
 fun AppListItem(modifier: Modifier = Modifier, app: App, onClick: () -> Unit = {}) {
     val isTv = LocalUI.current == UI.TV
     val itemWidth = if (isTv) 132.dp else dimensionResource(R.dimen.icon_size_cluster)
+    val itemHeight = if (isTv) 184.dp else null
+    val titleHeight = if (isTv) 40.dp else null
     val focusShape = RoundedCornerShape(dimensionResource(R.dimen.radius_medium))
     Column(
         modifier = modifier
             .width(itemWidth)
-            .tvFocusRing(focusShape, focusedScale = 1.06f)
+            .then(if (itemHeight != null) Modifier.height(itemHeight) else Modifier)
+            .tvFocusRing(focusShape, focusedScale = if (isTv) 1.03f else 1f)
             .clickable(onClick = onClick)
             .padding(all = dimensionResource(R.dimen.spacing_xsmall)),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -78,7 +82,8 @@ fun AppListItem(modifier: Modifier = Modifier, app: App, onClick: () -> Unit = {
         )
         Text(
             modifier = Modifier
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .then(if (titleHeight != null) Modifier.height(titleHeight) else Modifier),
             text = app.displayName,
             style = MaterialTheme.typography.labelMedium,
             maxLines = 2,
