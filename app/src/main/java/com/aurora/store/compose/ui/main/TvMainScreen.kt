@@ -116,6 +116,9 @@ private val TvRailCollapsedWidth = 88.dp
 private val TvRailExpandedWidth = 268.dp
 private val TvContentStartPadding = 32.dp
 private val TvCardWidth = 196.dp
+private val TvCardHeight = 282.dp
+private val TvAppShelfFocusPadding = 10.dp
+private val TvCategoryShelfFocusPadding = 8.dp
 
 private enum class TvHomeDestination(
     @StringRes val titleRes: Int,
@@ -846,7 +849,7 @@ private fun TvAppSection(
                 .fillMaxWidth()
                 .focusGroup(),
             horizontalArrangement = Arrangement.spacedBy(20.dp),
-            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 8.dp)
+            contentPadding = PaddingValues(horizontal = 2.dp, vertical = TvAppShelfFocusPadding)
         ) {
             items(count = apps.size, key = { apps[it].packageName }) { index ->
                 TvAppCard(app = apps[index], onClick = { onAppClick(apps[index]) })
@@ -861,12 +864,12 @@ private fun TvAppCard(app: App, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .width(TvCardWidth)
-            .height(282.dp)
+            .height(TvCardHeight)
             .tvFocusSurface(
                 shape = shape,
                 normalColor = MaterialTheme.colorScheme.surfaceContainer,
                 focusedColor = MaterialTheme.colorScheme.primaryContainer,
-                focusedScale = 1.08f
+                focusedScale = 1f
             )
             .clickable(onClick = onClick)
             .padding(14.dp),
@@ -927,7 +930,10 @@ private fun TvCategorySection(
                 .fillMaxWidth()
                 .focusGroup(),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 8.dp)
+            contentPadding = PaddingValues(
+                horizontal = 2.dp,
+                vertical = TvCategoryShelfFocusPadding
+            )
         ) {
             items(count = categories.size, key = { categories[it].title }) { index ->
                 TvCategoryCard(
@@ -950,7 +956,7 @@ private fun TvCategoryCard(category: Category, onClick: () -> Unit) {
                 shape = shape,
                 normalColor = MaterialTheme.colorScheme.surfaceContainer,
                 focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                focusedScale = 1.04f
+                focusedScale = 1f
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp),
