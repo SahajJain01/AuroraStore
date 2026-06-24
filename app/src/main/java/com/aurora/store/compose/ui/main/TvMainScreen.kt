@@ -56,11 +56,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -180,6 +186,7 @@ internal fun TvMainScreen(
             }
         )
     }
+    val contentFocusRequester = remember { FocusRequester() }
 
     Row(
         modifier = Modifier
@@ -189,6 +196,7 @@ internal fun TvMainScreen(
         TvNavigationDrawer(
             selected = selected,
             updateCount = updateCount,
+            contentFocusRequester = contentFocusRequester,
             onSelect = { selected = it },
             onSearch = { onNavigateTo(Destination.Search) },
             onDownloads = { onNavigateTo(Destination.Downloads) },
@@ -213,16 +221,19 @@ internal fun TvMainScreen(
             when (selected) {
                 TvHomeDestination.APPS -> TvStoreFrontPage(
                     pageType = 0,
+                    contentFocusRequester = contentFocusRequester,
                     onNavigateTo = onNavigateTo
                 )
 
                 TvHomeDestination.GAMES -> TvStoreFrontPage(
                     pageType = 1,
+                    contentFocusRequester = contentFocusRequester,
                     onNavigateTo = onNavigateTo
                 )
 
                 TvHomeDestination.UPDATES -> TvUpdatesPage(
                     viewModel = updatesViewModel,
+                    contentFocusRequester = contentFocusRequester,
                     onNavigateTo = onNavigateTo,
                     onAppUpdateTarget = onAppUpdateTarget
                 )
@@ -235,6 +246,7 @@ internal fun TvMainScreen(
 private fun TvNavigationDrawer(
     selected: TvHomeDestination,
     updateCount: Int,
+    contentFocusRequester: FocusRequester,
     onSelect: (TvHomeDestination) -> Unit,
     onSearch: () -> Unit,
     onDownloads: () -> Unit,
@@ -263,6 +275,13 @@ private fun TvNavigationDrawer(
         modifier = Modifier
             .fillMaxHeight()
             .width(railWidth)
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && event.key == Key.DirectionRight) {
+                    runCatching { contentFocusRequester.requestFocus() }.getOrDefault(false)
+                } else {
+                    false
+                }
+            }
             .focusGroup()
             .onFocusChanged { expanded = it.hasFocus || it.isFocused }
     ) {
@@ -272,12 +291,17 @@ private fun TvNavigationDrawer(
                 .padding(start = railPadding, top = TvOverscanVertical, end = railPadding),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            TvDrawerLogo(expanded = expanded, onClick = onSearch)
+            TvDrawerLogo(
+                expanded = expanded,
+                contentFocusRequester = contentFocusRequester,
+                onClick = onSearch
+            )
 
             TvDrawerActionItem(
                 labelRes = R.string.action_search,
                 iconRes = R.drawable.ic_round_search,
                 expanded = expanded,
+                contentFocusRequester = contentFocusRequester,
                 onClick = onSearch
             )
 
@@ -289,6 +313,7 @@ private fun TvNavigationDrawer(
                     selected = selected == destination,
                     updateCount = updateCount,
                     expanded = expanded,
+                    contentFocusRequester = contentFocusRequester,
                     onClick = { onSelect(destination) },
                     modifier = if (index == 0) {
                         Modifier.focusRequester(initialFocus)
@@ -304,12 +329,14 @@ private fun TvNavigationDrawer(
                 labelRes = R.string.title_download_manager,
                 iconRes = R.drawable.ic_download_manager,
                 expanded = expanded,
+                contentFocusRequester = contentFocusRequester,
                 onClick = onDownloads
             )
             TvDrawerActionItem(
                 labelRes = R.string.title_settings,
                 iconRes = R.drawable.ic_settings_account,
                 expanded = expanded,
+                contentFocusRequester = contentFocusRequester,
                 onClick = onSettings
             )
         }
@@ -317,12 +344,17 @@ private fun TvNavigationDrawer(
 }
 
 @Composable
-private fun TvDrawerLogo(expanded: Boolean, onClick: () -> Unit) {
+private fun TvDrawerLogo(
+    expanded: Boolean,
+    contentFocusRequester: FocusRequester,
+    onClick: () -> Unit
+) {
     val shape = RoundedCornerShape(24.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(60.dp)
+            .focusProperties { right = contentFocusRequester }
             .tvFocusSurface(
                 shape = shape,
                 normalColor = Color.Transparent,
@@ -359,6 +391,7 @@ private fun TvDrawerDestinationItem(
     selected: Boolean,
     updateCount: Int,
     expanded: Boolean,
+    contentFocusRequester: FocusRequester,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -383,6 +416,7 @@ private fun TvDrawerDestinationItem(
         modifier = modifier
             .fillMaxWidth()
             .height(60.dp)
+            .focusProperties { right = contentFocusRequester }
             .tvFocusSurface(
                 shape = shape,
                 normalColor = normalColor,
@@ -429,6 +463,7 @@ private fun TvDrawerActionItem(
     @StringRes labelRes: Int,
     @DrawableRes iconRes: Int,
     expanded: Boolean,
+    contentFocusRequester: FocusRequester,
     onClick: () -> Unit
 ) {
     val shape = RoundedCornerShape(24.dp)
@@ -436,6 +471,7 @@ private fun TvDrawerActionItem(
         modifier = Modifier
             .fillMaxWidth()
             .height(58.dp)
+            .focusProperties { right = contentFocusRequester }
             .tvFocusSurface(
                 shape = shape,
                 normalColor = Color.Transparent,
@@ -511,6 +547,7 @@ private fun TvInfoPill(text: String) {
 @Composable
 private fun TvStoreFrontPage(
     pageType: Int,
+    contentFocusRequester: FocusRequester,
     streamViewModel: StreamViewModel = hiltViewModel(key = "tv_stream_$pageType"),
     topChartViewModel: TopChartViewModel = hiltViewModel(key = "tv_topChart_$pageType"),
     categoryViewModel: CategoryViewModel = hiltViewModel(key = "tv_category_$pageType"),
@@ -561,6 +598,7 @@ private fun TvStoreFrontPage(
         streamBundle = streamBundle,
         topChartCluster = topChartCluster,
         categories = categories,
+        contentFocusRequester = contentFocusRequester,
         streamLoading = streamState == null || streamState is ViewState.Loading,
         chartLoading = chartState is ViewState.Loading,
         categoriesLoading = categoryState == null || categoryState is ViewState.Loading,
@@ -581,6 +619,7 @@ private fun TvBrowsePage(
     streamBundle: StreamBundle?,
     topChartCluster: StreamCluster?,
     categories: List<Category>?,
+    contentFocusRequester: FocusRequester,
     streamLoading: Boolean,
     chartLoading: Boolean,
     categoriesLoading: Boolean,
@@ -620,7 +659,11 @@ private fun TvBrowsePage(
     ) {
         when {
             heroApp != null -> item(key = "featured") {
-                TvFeaturedApp(app = heroApp, onClick = { onAppClick(heroApp) })
+                TvFeaturedApp(
+                    app = heroApp,
+                    modifier = Modifier.focusRequester(contentFocusRequester),
+                    onClick = { onAppClick(heroApp) }
+                )
             }
 
             streamLoading -> item(key = "featured_loading") {
@@ -695,10 +738,10 @@ private fun TvBrowsePage(
 }
 
 @Composable
-private fun TvFeaturedApp(app: App, onClick: () -> Unit) {
+private fun TvFeaturedApp(app: App, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val shape = RoundedCornerShape(28.dp)
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(238.dp)
             .tvFocusSurface(
@@ -934,6 +977,7 @@ private fun TvCategoryCard(category: Category, onClick: () -> Unit) {
 @Composable
 private fun TvUpdatesPage(
     viewModel: UpdatesViewModel,
+    contentFocusRequester: FocusRequester,
     onNavigateTo: (Destination) -> Unit,
     onAppUpdateTarget: (Update) -> Unit
 ) {
@@ -997,6 +1041,7 @@ private fun TvUpdatesPage(
                     TvUpdateActions(
                         count = activeUpdates.size,
                         fetching = fetchingUpdates,
+                        contentFocusRequester = contentFocusRequester,
                         onRefresh = { viewModel.fetchUpdates() },
                         onUpdateAll = { requestUpdateAll(activeUpdates.map { it.key }) }
                     )
@@ -1041,6 +1086,7 @@ private fun TvUpdatesPage(
 private fun TvUpdateActions(
     count: Int,
     fetching: Boolean,
+    contentFocusRequester: FocusRequester,
     onRefresh: () -> Unit,
     onUpdateAll: () -> Unit
 ) {
@@ -1059,6 +1105,7 @@ private fun TvUpdateActions(
             modifier = Modifier.weight(1f)
         )
         TvActionChip(
+            modifier = Modifier.focusRequester(contentFocusRequester),
             title = stringResource(R.string.check_updates),
             enabled = !fetching,
             onClick = onRefresh
@@ -1171,7 +1218,12 @@ private fun TvUpdateRow(
 }
 
 @Composable
-private fun TvActionChip(title: String, enabled: Boolean = true, onClick: () -> Unit) {
+private fun TvActionChip(
+    title: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
     val shape = RoundedCornerShape(22.dp)
     val normalColor = if (enabled) {
         MaterialTheme.colorScheme.surfaceContainerHigh
@@ -1185,7 +1237,7 @@ private fun TvActionChip(title: String, enabled: Boolean = true, onClick: () -> 
     }
 
     Row(
-        modifier = Modifier
+        modifier = modifier
             .widthIn(min = 124.dp)
             .height(50.dp)
             .tvFocusSurface(
