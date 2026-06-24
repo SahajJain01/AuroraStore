@@ -5,20 +5,15 @@
 
 package com.aurora.store.compose.composable
 
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
@@ -39,15 +34,10 @@ fun Modifier.tvFocusRing(
         targetValue = if (focused) focusedScale else 1f,
         label = "tvFocusScale"
     )
-    val borderWidth by animateDpAsState(
-        targetValue = if (focused) 3.dp else 1.dp,
-        label = "tvFocusBorder"
+    val elevation by animateFloatAsState(
+        targetValue = if (focused) 18f else 0f,
+        label = "tvFocusElevation"
     )
-    val borderColor = if (focused) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        Color.Transparent
-    }
 
     return this
         .onFocusChanged { focused = it.isFocused || it.hasFocus }
@@ -55,7 +45,8 @@ fun Modifier.tvFocusRing(
         .graphicsLayer {
             scaleX = scale
             scaleY = scale
+            shadowElevation = elevation.dp.toPx()
+            this.shape = shape
+            clip = false
         }
-        .clip(shape)
-        .border(borderWidth, borderColor, shape)
 }

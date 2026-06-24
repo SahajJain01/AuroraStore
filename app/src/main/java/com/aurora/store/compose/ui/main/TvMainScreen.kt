@@ -7,6 +7,9 @@ package com.aurora.store.compose.ui.main
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
@@ -50,6 +53,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -57,6 +64,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
@@ -76,7 +84,6 @@ import com.aurora.store.R
 import com.aurora.store.compose.composable.ContainedLoadingIndicator
 import com.aurora.store.compose.composable.Placeholder
 import com.aurora.store.compose.composable.app.AnimatedAppIcon
-import com.aurora.store.compose.composable.tvFocusRing
 import com.aurora.store.compose.navigation.Destination
 import com.aurora.store.data.model.DownloadStatus
 import com.aurora.store.data.model.PermissionType
@@ -99,6 +106,41 @@ private enum class TvHomeDestination(
     APPS(R.string.title_apps, R.string.tab_for_you, R.drawable.ic_apps),
     GAMES(R.string.title_games, R.string.tab_for_you, R.drawable.ic_games),
     UPDATES(R.string.title_updates, R.string.check_updates, R.drawable.ic_updates)
+}
+
+@Composable
+private fun Modifier.tvStandardFocus(
+    shape: Shape,
+    normalColor: Color,
+    focusedColor: Color,
+    focusedScale: Float = 1f
+): Modifier {
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (focused) focusedScale else 1f,
+        label = "tvFocusedScale"
+    )
+    val color by animateColorAsState(
+        targetValue = if (focused) focusedColor else normalColor,
+        label = "tvFocusedColor"
+    )
+    val elevation by animateFloatAsState(
+        targetValue = if (focused) 16f else 0f,
+        label = "tvFocusedElevation"
+    )
+
+    return this
+        .onFocusChanged { focused = it.isFocused || it.hasFocus }
+        .zIndex(if (focused) 1f else 0f)
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+            shadowElevation = elevation.dp.toPx()
+            this.shape = shape
+            clip = false
+        }
+        .clip(shape)
+        .background(color)
 }
 
 @Composable
@@ -174,6 +216,15 @@ private fun TvSideBar(
     onSettings: () -> Unit
 ) {
     val initialFocus = remember { FocusRequester() }
+    var expanded by remember { mutableStateOf(true) }
+    val railWidth by animateDpAsState(
+        targetValue = if (expanded) 248.dp else 88.dp,
+        label = "tvRailWidth"
+    )
+    val horizontalPadding by animateDpAsState(
+        targetValue = if (expanded) 18.dp else 12.dp,
+        label = "tvRailPadding"
+    )
 
     LaunchedEffect(Unit) {
         initialFocus.requestFocus()
@@ -184,24 +235,38 @@ private fun TvSideBar(
         tonalElevation = 3.dp,
         modifier = Modifier
             .fillMaxHeight()
-            .width(232.dp)
+            .width(railWidth)
+            .onFocusChanged { expanded = it.hasFocus || it.isFocused }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 18.dp, vertical = 24.dp),
+                .padding(horizontal = horizontalPadding, vertical = 24.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
-            )
+            if (expanded) {
+                Text(
+                    text = stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+                )
+            } else {
+                Icon(
+                    painter = painterResource(R.drawable.ic_logo),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .size(42.dp)
+                        .padding(vertical = 6.dp)
+                )
+            }
 
             TvActionItem(
                 labelRes = R.string.action_search,
                 iconRes = R.drawable.ic_round_search,
+                expanded = expanded,
                 onClick = onSearch
             )
 
@@ -212,6 +277,7 @@ private fun TvSideBar(
                     destination = destination,
                     selected = selected == destination,
                     updateCount = updateCount,
+                    expanded = expanded,
                     onClick = { onSelect(destination) },
                     modifier = if (index == 0) {
                         Modifier.focusRequester(initialFocus)
@@ -226,11 +292,13 @@ private fun TvSideBar(
             TvActionItem(
                 labelRes = R.string.title_download_manager,
                 iconRes = R.drawable.ic_download_manager,
+                expanded = expanded,
                 onClick = onDownloads
             )
             TvActionItem(
                 labelRes = R.string.title_settings,
                 iconRes = R.drawable.ic_settings_account,
+                expanded = expanded,
                 onClick = onSettings
             )
         }
@@ -242,6 +310,7 @@ private fun TvNavItem(
     destination: TvHomeDestination,
     selected: Boolean,
     updateCount: Int,
+    expanded: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -261,36 +330,47 @@ private fun TvNavItem(
         modifier = modifier
             .fillMaxWidth()
             .height(60.dp)
-            .tvFocusRing(shape, focusedScale = 1.02f)
-            .clip(shape)
-            .background(background)
+            .tvStandardFocus(
+                shape = shape,
+                normalColor = background,
+                focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                focusedScale = 1.03f
+            )
             .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = if (expanded) 18.dp else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+        horizontalArrangement = if (expanded) {
+            Arrangement.spacedBy(14.dp)
+        } else {
+            Arrangement.Center
+        }
     ) {
         if (destination == TvHomeDestination.UPDATES && updateCount > 0) {
             BadgedBox(badge = { Badge { Text("$updateCount") } }) {
                 Icon(
                     painter = painterResource(destination.iconRes),
                     contentDescription = null,
-                    tint = foreground
+                    tint = foreground,
+                    modifier = Modifier.size(26.dp)
                 )
             }
         } else {
             Icon(
                 painter = painterResource(destination.iconRes),
                 contentDescription = null,
-                tint = foreground
+                tint = foreground,
+                modifier = Modifier.size(26.dp)
             )
         }
-        Text(
-            text = stringResource(destination.titleRes),
-            style = MaterialTheme.typography.titleMedium,
-            color = foreground,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        if (expanded) {
+            Text(
+                text = stringResource(destination.titleRes),
+                style = MaterialTheme.typography.titleMedium,
+                color = foreground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
@@ -300,6 +380,7 @@ private fun TvActionItem(
     labelRes: Int,
     @DrawableRes
     iconRes: Int,
+    expanded: Boolean,
     onClick: () -> Unit
 ) {
     val shape = RoundedCornerShape(22.dp)
@@ -307,20 +388,34 @@ private fun TvActionItem(
         modifier = Modifier
             .fillMaxWidth()
             .height(58.dp)
-            .tvFocusRing(shape, focusedScale = 1.02f)
-            .clip(shape)
+            .tvStandardFocus(
+                shape = shape,
+                normalColor = Color.Transparent,
+                focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                focusedScale = 1.03f
+            )
             .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = if (expanded) 18.dp else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+        horizontalArrangement = if (expanded) {
+            Arrangement.spacedBy(14.dp)
+        } else {
+            Arrangement.Center
+        }
     ) {
-        Icon(painter = painterResource(iconRes), contentDescription = null)
-        Text(
-            text = stringResource(labelRes),
-            style = MaterialTheme.typography.titleSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = null,
+            modifier = Modifier.size(26.dp)
         )
+        if (expanded) {
+            Text(
+                text = stringResource(labelRes),
+                style = MaterialTheme.typography.titleSmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
@@ -446,11 +541,11 @@ private fun TvStoreFrontBody(
             }
         }
 
-        clusters.take(5).forEach { cluster ->
+        clusters.take(4).forEach { cluster ->
             item(key = "cluster_${cluster.id}") {
                 TvAppSection(
                     title = cluster.clusterTitle,
-                    apps = cluster.clusterAppList.tvOptimizedFirst().take(16),
+                    apps = cluster.clusterAppList.tvOptimizedFirst().take(12),
                     onHeaderClick = if (cluster.clusterBrowseUrl.isNotBlank()) {
                         { onHeaderClick(cluster) }
                     } else {
@@ -480,7 +575,7 @@ private fun TvStoreFrontBody(
             item(key = "top_free") {
                 TvAppSection(
                     title = stringResource(R.string.tab_top_free),
-                    apps = topChartCluster?.clusterAppList?.tvOptimizedFirst()?.take(20)
+                    apps = topChartCluster?.clusterAppList?.tvOptimizedFirst()?.take(14)
                         .orEmpty(),
                     loading = chartLoading,
                     onAppClick = onAppClick
@@ -491,7 +586,7 @@ private fun TvStoreFrontBody(
         if (!categories.isNullOrEmpty() || categoriesLoading) {
             item(key = "categories") {
                 TvCategorySection(
-                    categories = categories.orEmpty().take(18),
+                    categories = categories.orEmpty().take(12),
                     loading = categoriesLoading,
                     onCategoryClick = onCategoryClick
                 )
@@ -516,12 +611,17 @@ private fun TvStoreFrontBody(
 private fun TvHeroApp(app: App, onClick: () -> Unit) {
     val shape = RoundedCornerShape(28.dp)
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = Color.Transparent,
         shape = shape,
         modifier = Modifier
             .fillMaxWidth()
             .height(220.dp)
-            .tvFocusRing(shape, focusedScale = 1.01f)
+            .tvStandardFocus(
+                shape = shape,
+                normalColor = MaterialTheme.colorScheme.surfaceContainer,
+                focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                focusedScale = 1.015f
+            )
             .clickable(onClick = onClick)
     ) {
         Row(
@@ -535,7 +635,7 @@ private fun TvHeroApp(app: App, onClick: () -> Unit) {
                     .clip(RoundedCornerShape(32.dp)),
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(app.iconArtwork.url)
-                    .crossfade(true)
+                    .crossfade(false)
                     .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop
@@ -600,7 +700,11 @@ private fun TvAppSection(
             contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp)
         ) {
             items(count = apps.size, key = { apps[it].packageName }) { index ->
-                if (index == apps.lastIndex) onEndReached?.invoke()
+                if (index == apps.lastIndex && onEndReached != null) {
+                    LaunchedEffect(apps[index].packageName) {
+                        onEndReached()
+                    }
+                }
                 TvAppCard(app = apps[index], onClick = { onAppClick(apps[index]) })
             }
         }
@@ -614,9 +718,12 @@ private fun TvAppCard(app: App, onClick: () -> Unit) {
         modifier = Modifier
             .width(164.dp)
             .height(238.dp)
-            .tvFocusRing(shape, focusedScale = 1.07f)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .tvStandardFocus(
+                shape = shape,
+                normalColor = MaterialTheme.colorScheme.surfaceContainer,
+                focusedColor = MaterialTheme.colorScheme.primaryContainer,
+                focusedScale = 1.08f
+            )
             .clickable(onClick = onClick)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -628,7 +735,7 @@ private fun TvAppCard(app: App, onClick: () -> Unit) {
                 .clip(RoundedCornerShape(18.dp)),
             model = ImageRequest.Builder(LocalContext.current)
                 .data(app.iconArtwork.url)
-                .crossfade(true)
+                .crossfade(false)
                 .build(),
             contentDescription = null,
             contentScale = ContentScale.Crop
@@ -686,9 +793,12 @@ private fun TvCategoryCard(category: Category, onClick: () -> Unit) {
         modifier = Modifier
             .width(230.dp)
             .height(82.dp)
-            .tvFocusRing(shape, focusedScale = 1.04f)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .tvStandardFocus(
+                shape = shape,
+                normalColor = MaterialTheme.colorScheme.surfaceContainer,
+                focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                focusedScale = 1.04f
+            )
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -865,9 +975,12 @@ private fun TvUpdateRow(
         modifier = Modifier
             .fillMaxWidth()
             .height(112.dp)
-            .tvFocusRing(shape, focusedScale = 1.01f)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .tvStandardFocus(
+                shape = shape,
+                normalColor = MaterialTheme.colorScheme.surfaceContainer,
+                focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                focusedScale = 1.015f
+            )
             .clickable(onClick = onClick)
             .padding(horizontal = 22.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -935,7 +1048,12 @@ private fun TvSectionHeader(title: String, onClick: (() -> Unit)? = null) {
             .then(
                 if (onClick != null) {
                     Modifier
-                        .tvFocusRing(RoundedCornerShape(18.dp))
+                        .tvStandardFocus(
+                            shape = RoundedCornerShape(18.dp),
+                            normalColor = Color.Transparent,
+                            focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            focusedScale = 1.01f
+                        )
                         .clickable(onClick = onClick)
                 } else {
                     Modifier
@@ -969,9 +1087,12 @@ private fun TvWideAction(title: String, @DrawableRes iconRes: Int, onClick: () -
         modifier = Modifier
             .fillMaxWidth()
             .height(70.dp)
-            .tvFocusRing(shape, focusedScale = 1.01f)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .tvStandardFocus(
+                shape = shape,
+                normalColor = MaterialTheme.colorScheme.surfaceContainer,
+                focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                focusedScale = 1.015f
+            )
             .clickable(onClick = onClick)
             .padding(horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
