@@ -103,3 +103,37 @@ val BrandDarkColorScheme = darkColorScheme(
     errorContainer = Color(0xFF93000A),
     onErrorContainer = Color(0xFFFFDAD6)
 )
+
+val TvDarkColorScheme = darkColorScheme(
+    primary = Color(0xFF8EDDD1),
+    onPrimary = Color(0xFF003733),
+    primaryContainer = Color(0xFF114C49),
+    onPrimaryContainer = Color(0xFFC7FFF5),
+    secondary = Color(0xFFBEC8D7),
+    onSecondary = Color(0xFF283240),
+    secondaryContainer = Color(0xFF3D4857),
+    onSecondaryContainer = Color(0xFFDAE4F4),
+    tertiary = Color(0xFFD7BDEB),
+    onTertiary = Color(0xFF3E284E),
+    tertiaryContainer = Color(0xFF563F66),
+    onTertiaryContainer = Color(0xFFF1D8FF),
+    background = Color(0xFF080A0F),
+    onBackground = Color(0xFFE6EAF2),
+    surface = Color(0xFF080A0F),
+    onSurface = Color(0xFFE6EAF2),
+    surfaceVariant = Color(0xFF3F4652),
+    onSurfaceVariant = Color(0xFFC3CBD8),
+    surfaceDim = Color(0xFF080A0F),
+    surfaceBright = Color(0xFF262B34),
+    surfaceContainerLowest = Color(0xFF05070A),
+    surfaceContainerLow = Color(0xFF0E1118),
+    surfaceContainer = Color(0xFF131821),
+    surfaceContainerHigh = Color(0xFF1A202A),
+    surfaceContainerHighest = Color(0xFF242B36),
+    outline = Color(0xFF8D96A5),
+    outlineVariant = Color(0xFF3F4652),
+    error = Color(0xFFFFB4AB),
+    onError = Color(0xFF690005),
+    errorContainer = Color(0xFF93000A),
+    onErrorContainer = Color(0xFFFFDAD6)
+)

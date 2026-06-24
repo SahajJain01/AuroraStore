@@ -71,7 +71,7 @@ class ComposeActivity : FragmentActivity() {
             val networkStatus by networkProvider.status.collectAsStateWithLifecycle(
                 initialValue = NetworkStatus.AVAILABLE
             )
-            AuroraTheme {
+            AuroraTheme(forceDarkTheme = localUI == UI.TV) {
                 var lockState by remember {
                     mutableStateOf(
                         if (appLockManager.shouldLock(this@ComposeActivity)) {

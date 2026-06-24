@@ -30,7 +30,7 @@ import com.aurora.store.util.Preferences
  * App theme for Aurora Store based on [MaterialExpressiveTheme]
  */
 @Composable
-fun AuroraTheme(content: @Composable () -> Unit) {
+fun AuroraTheme(forceDarkTheme: Boolean = false, content: @Composable () -> Unit) {
     val context = LocalContext.current
 
     var themeStyle by remember {
@@ -60,7 +60,8 @@ fun AuroraTheme(content: @Composable () -> Unit) {
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
-    val useDynamicColor = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val useDynamicColor =
+        !forceDarkTheme && dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
     val lightScheme = if (useDynamicColor) {
         dynamicLightColorScheme(context)
@@ -68,22 +69,32 @@ fun AuroraTheme(content: @Composable () -> Unit) {
         BrandLightColorScheme
     }
 
-    val darkScheme = if (useDynamicColor) {
+    val darkScheme = if (forceDarkTheme) {
+        TvDarkColorScheme
+    } else if (useDynamicColor) {
         dynamicDarkColorScheme(context)
     } else {
         BrandDarkColorScheme
     }
 
-    val colorScheme = when (themeStyle) {
-        1 -> lightScheme
-        2 -> darkScheme
-        else -> if (isSystemInDarkTheme()) darkScheme else lightScheme
+    val colorScheme = if (forceDarkTheme) {
+        TvDarkColorScheme
+    } else {
+        when (themeStyle) {
+            1 -> lightScheme
+            2 -> darkScheme
+            else -> if (isSystemInDarkTheme()) darkScheme else lightScheme
+        }
     }
 
-    val darkTheme = when (themeStyle) {
-        1 -> false
-        2 -> true
-        else -> isSystemInDarkTheme()
+    val darkTheme = if (forceDarkTheme) {
+        true
+    } else {
+        when (themeStyle) {
+            1 -> false
+            2 -> true
+            else -> isSystemInDarkTheme()
+        }
     }
 
     /**

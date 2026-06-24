@@ -10,6 +10,7 @@ import androidx.annotation.StringRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
@@ -28,26 +29,29 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -97,6 +101,15 @@ import com.aurora.store.viewmodel.all.UpdatesViewModel
 import com.aurora.store.viewmodel.category.CategoryViewModel
 import com.aurora.store.viewmodel.homestream.StreamViewModel
 import com.aurora.store.viewmodel.topchart.TopChartViewModel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+
+private val TvOverscanHorizontal = 58.dp
+private val TvOverscanVertical = 28.dp
+private val TvRailCollapsedWidth = 88.dp
+private val TvRailExpandedWidth = 268.dp
+private val TvContentStartPadding = 32.dp
+private val TvCardWidth = 196.dp
 
 private enum class TvHomeDestination(
     @StringRes val titleRes: Int,
@@ -108,39 +121,46 @@ private enum class TvHomeDestination(
     UPDATES(R.string.title_updates, R.string.check_updates, R.drawable.ic_updates)
 }
 
+private data class TvDisplayCluster(
+    val cluster: StreamCluster,
+    val apps: List<App>
+)
+
 @Composable
-private fun Modifier.tvStandardFocus(
+private fun Modifier.tvFocusSurface(
     shape: Shape,
     normalColor: Color,
     focusedColor: Color,
-    focusedScale: Float = 1f
+    focusedScale: Float = 1f,
+    onFocusedChange: ((Boolean) -> Unit)? = null
 ): Modifier {
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (focused) focusedScale else 1f,
-        label = "tvFocusedScale"
+        animationSpec = tween(durationMillis = 110),
+        label = "tvFocusScale"
     )
-    val color by animateColorAsState(
+    val containerColor by animateColorAsState(
         targetValue = if (focused) focusedColor else normalColor,
-        label = "tvFocusedColor"
-    )
-    val elevation by animateFloatAsState(
-        targetValue = if (focused) 16f else 0f,
-        label = "tvFocusedElevation"
+        animationSpec = tween(durationMillis = 90),
+        label = "tvFocusColor"
     )
 
     return this
-        .onFocusChanged { focused = it.isFocused || it.hasFocus }
+        .onFocusChanged {
+            val nextFocused = it.isFocused || it.hasFocus
+            focused = nextFocused
+            onFocusedChange?.invoke(nextFocused)
+        }
         .zIndex(if (focused) 1f else 0f)
         .graphicsLayer {
             scaleX = scale
             scaleY = scale
-            shadowElevation = elevation.dp.toPx()
             this.shape = shape
             clip = false
         }
         .clip(shape)
-        .background(color)
+        .background(containerColor)
 }
 
 @Composable
@@ -164,9 +184,9 @@ internal fun TvMainScreen(
     Row(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
+            .background(MaterialTheme.colorScheme.background)
     ) {
-        TvSideBar(
+        TvNavigationDrawer(
             selected = selected,
             updateCount = updateCount,
             onSelect = { selected = it },
@@ -179,11 +199,16 @@ internal fun TvMainScreen(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .padding(start = 28.dp, top = 28.dp, end = 36.dp, bottom = 24.dp)
+                .padding(
+                    start = TvContentStartPadding,
+                    top = TvOverscanVertical,
+                    end = TvOverscanHorizontal,
+                    bottom = TvOverscanVertical
+                )
         ) {
-            TvHeader(destination = selected)
+            TvPageHeader(destination = selected, updateCount = updateCount)
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(18.dp))
 
             when (selected) {
                 TvHomeDestination.APPS -> TvStoreFrontPage(
@@ -207,7 +232,7 @@ internal fun TvMainScreen(
 }
 
 @Composable
-private fun TvSideBar(
+private fun TvNavigationDrawer(
     selected: TvHomeDestination,
     updateCount: Int,
     onSelect: (TvHomeDestination) -> Unit,
@@ -218,11 +243,13 @@ private fun TvSideBar(
     val initialFocus = remember { FocusRequester() }
     var expanded by remember { mutableStateOf(true) }
     val railWidth by animateDpAsState(
-        targetValue = if (expanded) 248.dp else 88.dp,
+        targetValue = if (expanded) TvRailExpandedWidth else TvRailCollapsedWidth,
+        animationSpec = tween(durationMillis = 140),
         label = "tvRailWidth"
     )
-    val horizontalPadding by animateDpAsState(
-        targetValue = if (expanded) 18.dp else 12.dp,
+    val railPadding by animateDpAsState(
+        targetValue = if (expanded) 20.dp else 12.dp,
+        animationSpec = tween(durationMillis = 140),
         label = "tvRailPadding"
     )
 
@@ -231,49 +258,33 @@ private fun TvSideBar(
     }
 
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        tonalElevation = 3.dp,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 0.dp,
         modifier = Modifier
             .fillMaxHeight()
             .width(railWidth)
+            .focusGroup()
             .onFocusChanged { expanded = it.hasFocus || it.isFocused }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = horizontalPadding, vertical = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(start = railPadding, top = TvOverscanVertical, end = railPadding),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            if (expanded) {
-                Text(
-                    text = stringResource(R.string.app_name),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
-                )
-            } else {
-                Icon(
-                    painter = painterResource(R.drawable.ic_logo),
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .size(42.dp)
-                        .padding(vertical = 6.dp)
-                )
-            }
+            TvDrawerLogo(expanded = expanded, onClick = onSearch)
 
-            TvActionItem(
+            TvDrawerActionItem(
                 labelRes = R.string.action_search,
                 iconRes = R.drawable.ic_round_search,
                 expanded = expanded,
                 onClick = onSearch
             )
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
 
             TvHomeDestination.entries.forEachIndexed { index, destination ->
-                TvNavItem(
+                TvDrawerDestinationItem(
                     destination = destination,
                     selected = selected == destination,
                     updateCount = updateCount,
@@ -289,13 +300,13 @@ private fun TvSideBar(
 
             Spacer(Modifier.weight(1f))
 
-            TvActionItem(
+            TvDrawerActionItem(
                 labelRes = R.string.title_download_manager,
                 iconRes = R.drawable.ic_download_manager,
                 expanded = expanded,
                 onClick = onDownloads
             )
-            TvActionItem(
+            TvDrawerActionItem(
                 labelRes = R.string.title_settings,
                 iconRes = R.drawable.ic_settings_account,
                 expanded = expanded,
@@ -306,67 +317,35 @@ private fun TvSideBar(
 }
 
 @Composable
-private fun TvNavItem(
-    destination: TvHomeDestination,
-    selected: Boolean,
-    updateCount: Int,
-    expanded: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val shape = RoundedCornerShape(22.dp)
-    val background = if (selected) {
-        MaterialTheme.colorScheme.primaryContainer
-    } else {
-        MaterialTheme.colorScheme.surfaceContainer
-    }
-    val foreground = if (selected) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        MaterialTheme.colorScheme.onSurface
-    }
-
+private fun TvDrawerLogo(expanded: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(24.dp)
     Row(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .height(60.dp)
-            .tvStandardFocus(
+            .tvFocusSurface(
                 shape = shape,
-                normalColor = background,
+                normalColor = Color.Transparent,
                 focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 focusedScale = 1.03f
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = if (expanded) 18.dp else 0.dp),
+            .padding(horizontal = if (expanded) 16.dp else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = if (expanded) {
-            Arrangement.spacedBy(14.dp)
-        } else {
-            Arrangement.Center
-        }
+        horizontalArrangement = if (expanded) Arrangement.spacedBy(14.dp) else Arrangement.Center
     ) {
-        if (destination == TvHomeDestination.UPDATES && updateCount > 0) {
-            BadgedBox(badge = { Badge { Text("$updateCount") } }) {
-                Icon(
-                    painter = painterResource(destination.iconRes),
-                    contentDescription = null,
-                    tint = foreground,
-                    modifier = Modifier.size(26.dp)
-                )
-            }
-        } else {
-            Icon(
-                painter = painterResource(destination.iconRes),
-                contentDescription = null,
-                tint = foreground,
-                modifier = Modifier.size(26.dp)
-            )
-        }
+        Icon(
+            painter = painterResource(R.drawable.ic_logo),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(30.dp)
+        )
         if (expanded) {
             Text(
-                text = stringResource(destination.titleRes),
+                text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.titleMedium,
-                color = foreground,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -375,20 +354,89 @@ private fun TvNavItem(
 }
 
 @Composable
-private fun TvActionItem(
-    @StringRes
-    labelRes: Int,
-    @DrawableRes
-    iconRes: Int,
+private fun TvDrawerDestinationItem(
+    destination: TvHomeDestination,
+    selected: Boolean,
+    updateCount: Int,
+    expanded: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val shape = RoundedCornerShape(24.dp)
+    val normalColor = if (selected) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        Color.Transparent
+    }
+    val focusedColor = if (selected) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerHighest
+    }
+    val contentColor = if (selected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(60.dp)
+            .tvFocusSurface(
+                shape = shape,
+                normalColor = normalColor,
+                focusedColor = focusedColor,
+                focusedScale = 1.03f
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = if (expanded) 18.dp else 0.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = if (expanded) Arrangement.spacedBy(14.dp) else Arrangement.Center
+    ) {
+        if (destination == TvHomeDestination.UPDATES && updateCount > 0) {
+            BadgedBox(badge = { Badge { Text("$updateCount") } }) {
+                Icon(
+                    painter = painterResource(destination.iconRes),
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        } else {
+            Icon(
+                painter = painterResource(destination.iconRes),
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(26.dp)
+            )
+        }
+        if (expanded) {
+            Text(
+                text = stringResource(destination.titleRes),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                color = contentColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun TvDrawerActionItem(
+    @StringRes labelRes: Int,
+    @DrawableRes iconRes: Int,
     expanded: Boolean,
     onClick: () -> Unit
 ) {
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(24.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(58.dp)
-            .tvStandardFocus(
+            .tvFocusSurface(
                 shape = shape,
                 normalColor = Color.Transparent,
                 focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -397,21 +445,19 @@ private fun TvActionItem(
             .clickable(onClick = onClick)
             .padding(horizontal = if (expanded) 18.dp else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = if (expanded) {
-            Arrangement.spacedBy(14.dp)
-        } else {
-            Arrangement.Center
-        }
+        horizontalArrangement = if (expanded) Arrangement.spacedBy(14.dp) else Arrangement.Center
     ) {
         Icon(
             painter = painterResource(iconRes),
             contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(26.dp)
         )
         if (expanded) {
             Text(
                 text = stringResource(labelRes),
                 style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -420,23 +466,46 @@ private fun TvActionItem(
 }
 
 @Composable
-private fun TvHeader(destination: TvHomeDestination) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(
-            text = stringResource(destination.titleRes),
-            style = MaterialTheme.typography.displaySmall,
-            fontWeight = FontWeight.SemiBold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(
-            text = stringResource(destination.subtitleRes),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+private fun TvPageHeader(destination: TvHomeDestination, updateCount: Int) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                text = stringResource(destination.titleRes),
+                style = MaterialTheme.typography.displaySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onBackground,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = stringResource(destination.subtitleRes),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        if (updateCount > 0) {
+            TvInfoPill(text = "$updateCount " + stringResource(R.string.title_updates))
+        }
     }
+}
+
+@Composable
+private fun TvInfoPill(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onPrimaryContainer,
+        maxLines = 1,
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.primaryContainer)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    )
 }
 
 @Composable
@@ -488,7 +557,7 @@ private fun TvStoreFrontPage(
         .let { it as? CategoryStash }
         ?.get(categoryType)
 
-    TvStoreFrontBody(
+    TvBrowsePage(
         streamBundle = streamBundle,
         topChartCluster = topChartCluster,
         categories = categories,
@@ -508,7 +577,7 @@ private fun TvStoreFrontPage(
 }
 
 @Composable
-private fun TvStoreFrontBody(
+private fun TvBrowsePage(
     streamBundle: StreamBundle?,
     topChartCluster: StreamCluster?,
     categories: List<Category>?,
@@ -521,10 +590,28 @@ private fun TvStoreFrontBody(
     onLoadMoreStream: () -> Unit,
     onClusterEnd: (StreamCluster) -> Unit
 ) {
-    val clusters = streamBundle?.streamClusters?.values
-        ?.filter { it.clusterTitle.isNotBlank() && it.clusterAppList.isNotEmpty() }
-        .orEmpty()
-    val heroApp = clusters.firstOrNull()?.clusterAppList?.tvOptimizedFirst()?.firstOrNull()
+    val clusters = remember(streamBundle) {
+        streamBundle?.streamClusters?.values
+            ?.filter { it.clusterTitle.isNotBlank() && it.clusterAppList.isNotEmpty() }
+            .orEmpty()
+    }
+    val displayClusters = remember(clusters) {
+        clusters.take(5).map { cluster ->
+            TvDisplayCluster(
+                cluster = cluster,
+                apps = cluster.clusterAppList.tvOptimizedFirst().take(14)
+            )
+        }
+    }
+    val heroApp = remember(clusters) {
+        clusters.firstOrNull()?.clusterAppList?.tvOptimizedFirst()?.firstOrNull()
+    }
+    val topChartApps = remember(topChartCluster) {
+        topChartCluster?.clusterAppList?.tvOptimizedFirst()?.take(14).orEmpty()
+    }
+    val categoryItems = remember(categories) {
+        categories.orEmpty().take(12)
+    }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -532,20 +619,21 @@ private fun TvStoreFrontBody(
         verticalArrangement = Arrangement.spacedBy(26.dp)
     ) {
         when {
-            heroApp != null -> item(key = "hero") {
-                TvHeroApp(app = heroApp, onClick = { onAppClick(heroApp) })
+            heroApp != null -> item(key = "featured") {
+                TvFeaturedApp(app = heroApp, onClick = { onAppClick(heroApp) })
             }
 
-            streamLoading -> item(key = "hero_loading") {
-                TvLoadingBand()
+            streamLoading -> item(key = "featured_loading") {
+                TvLoadingPanel(height = 238.dp)
             }
         }
 
-        clusters.take(4).forEach { cluster ->
+        displayClusters.forEach { displayCluster ->
+            val cluster = displayCluster.cluster
             item(key = "cluster_${cluster.id}") {
                 TvAppSection(
                     title = cluster.clusterTitle,
-                    apps = cluster.clusterAppList.tvOptimizedFirst().take(12),
+                    apps = displayCluster.apps,
                     onHeaderClick = if (cluster.clusterBrowseUrl.isNotBlank()) {
                         { onHeaderClick(cluster) }
                     } else {
@@ -562,7 +650,7 @@ private fun TvStoreFrontBody(
         }
 
         if (clusters.isNotEmpty() && streamBundle?.hasNext() == true) {
-            item(key = "load_more") {
+            item(key = "more_stream") {
                 TvWideAction(
                     title = stringResource(R.string.title_more),
                     iconRes = R.drawable.ic_arrow_down,
@@ -571,22 +659,21 @@ private fun TvStoreFrontBody(
             }
         }
 
-        if (!topChartCluster?.clusterAppList.isNullOrEmpty() || chartLoading) {
+        if (topChartApps.isNotEmpty() || chartLoading) {
             item(key = "top_free") {
                 TvAppSection(
                     title = stringResource(R.string.tab_top_free),
-                    apps = topChartCluster?.clusterAppList?.tvOptimizedFirst()?.take(14)
-                        .orEmpty(),
+                    apps = topChartApps,
                     loading = chartLoading,
                     onAppClick = onAppClick
                 )
             }
         }
 
-        if (!categories.isNullOrEmpty() || categoriesLoading) {
+        if (categoryItems.isNotEmpty() || categoriesLoading) {
             item(key = "categories") {
                 TvCategorySection(
-                    categories = categories.orEmpty().take(12),
+                    categories = categoryItems,
                     loading = categoriesLoading,
                     onCategoryClick = onCategoryClick
                 )
@@ -608,71 +695,70 @@ private fun TvStoreFrontBody(
 }
 
 @Composable
-private fun TvHeroApp(app: App, onClick: () -> Unit) {
+private fun TvFeaturedApp(app: App, onClick: () -> Unit) {
     val shape = RoundedCornerShape(28.dp)
-    Surface(
-        color = Color.Transparent,
-        shape = shape,
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(220.dp)
-            .tvStandardFocus(
+            .height(238.dp)
+            .tvFocusSurface(
                 shape = shape,
                 normalColor = MaterialTheme.colorScheme.surfaceContainer,
                 focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 focusedScale = 1.015f
             )
             .clickable(onClick = onClick)
+            .padding(26.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(26.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(24.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(24.dp)
+        TvAppArtwork(
+            imageUrl = app.iconArtwork.url,
+            modifier = Modifier.requiredSize(168.dp),
+            shape = RoundedCornerShape(34.dp)
+        )
+
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
         ) {
-            AsyncImage(
-                modifier = Modifier
-                    .requiredSize(156.dp)
-                    .clip(RoundedCornerShape(32.dp)),
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(app.iconArtwork.url)
-                    .crossfade(false)
-                    .build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop
+            Text(
+                text = stringResource(R.string.tab_for_you),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
             )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text(
-                    text = app.displayName,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = app.developerName,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = buildTvAppMeta(app),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Icon(
-                painter = painterResource(R.drawable.ic_arrow_forward),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(42.dp)
+            Text(
+                text = app.displayName,
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = app.developerName,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = buildTvAppMeta(app),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
+
+        Icon(
+            painter = painterResource(R.drawable.ic_arrow_forward),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(38.dp)
+        )
     }
 }
 
@@ -685,26 +771,41 @@ private fun TvAppSection(
     onAppClick: (App) -> Unit,
     onEndReached: (() -> Unit)? = null
 ) {
+    val rowState = rememberLazyListState()
+    var requestedSize by remember { mutableIntStateOf(-1) }
+
+    LaunchedEffect(rowState, apps.size, onEndReached) {
+        if (onEndReached == null || apps.isEmpty()) return@LaunchedEffect
+        snapshotFlow {
+            rowState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+        }
+            .distinctUntilChanged()
+            .filter { lastVisibleIndex ->
+                lastVisibleIndex >= apps.lastIndex - 1 && requestedSize != apps.size
+            }
+            .collect {
+                requestedSize = apps.size
+                onEndReached()
+            }
+    }
+
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TvSectionHeader(title = title, onClick = onHeaderClick)
+
         if (loading && apps.isEmpty()) {
-            TvLoadingBand()
+            TvLoadingPanel(height = 196.dp)
             return
         }
 
         LazyRow(
+            state = rowState,
             modifier = Modifier
                 .fillMaxWidth()
                 .focusGroup(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp)
+            horizontalArrangement = Arrangement.spacedBy(20.dp),
+            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 8.dp)
         ) {
             items(count = apps.size, key = { apps[it].packageName }) { index ->
-                if (index == apps.lastIndex && onEndReached != null) {
-                    LaunchedEffect(apps[index].packageName) {
-                        onEndReached()
-                    }
-                }
                 TvAppCard(app = apps[index], onClick = { onAppClick(apps[index]) })
             }
         }
@@ -713,12 +814,12 @@ private fun TvAppSection(
 
 @Composable
 private fun TvAppCard(app: App, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(24.dp)
     Column(
         modifier = Modifier
-            .width(164.dp)
-            .height(238.dp)
-            .tvStandardFocus(
+            .width(TvCardWidth)
+            .height(282.dp)
+            .tvFocusSurface(
                 shape = shape,
                 normalColor = MaterialTheme.colorScheme.surfaceContainer,
                 focusedColor = MaterialTheme.colorScheme.primaryContainer,
@@ -728,22 +829,18 @@ private fun TvAppCard(app: App, onClick: () -> Unit) {
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        AsyncImage(
+        TvAppArtwork(
+            imageUrl = app.iconArtwork.url,
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(18.dp)),
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(app.iconArtwork.url)
-                .crossfade(false)
-                .build(),
-            contentDescription = null,
-            contentScale = ContentScale.Crop
+                .aspectRatio(1f),
+            shape = RoundedCornerShape(20.dp)
         )
         Text(
             text = app.displayName,
             style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.SemiBold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
@@ -758,6 +855,19 @@ private fun TvAppCard(app: App, onClick: () -> Unit) {
 }
 
 @Composable
+private fun TvAppArtwork(imageUrl: String, modifier: Modifier, shape: Shape) {
+    AsyncImage(
+        modifier = modifier.clip(shape),
+        model = ImageRequest.Builder(LocalContext.current)
+            .data(imageUrl)
+            .crossfade(false)
+            .build(),
+        contentDescription = null,
+        contentScale = ContentScale.Crop
+    )
+}
+
+@Composable
 private fun TvCategorySection(
     categories: List<Category>,
     loading: Boolean,
@@ -766,15 +876,15 @@ private fun TvCategorySection(
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TvSectionHeader(title = stringResource(R.string.tab_categories))
         if (loading && categories.isEmpty()) {
-            TvLoadingBand()
+            TvLoadingPanel(height = 96.dp)
             return
         }
         LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .focusGroup(),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            contentPadding = PaddingValues(horizontal = 2.dp, vertical = 8.dp)
         ) {
             items(count = categories.size, key = { categories[it].title }) { index ->
                 TvCategoryCard(
@@ -788,12 +898,12 @@ private fun TvCategorySection(
 
 @Composable
 private fun TvCategoryCard(category: Category, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(24.dp)
     Row(
         modifier = Modifier
-            .width(230.dp)
-            .height(82.dp)
-            .tvStandardFocus(
+            .width(240.dp)
+            .height(84.dp)
+            .tvFocusSurface(
                 shape = shape,
                 normalColor = MaterialTheme.colorScheme.surfaceContainer,
                 focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -807,11 +917,14 @@ private fun TvCategoryCard(category: Category, onClick: () -> Unit) {
         Icon(
             painter = painterResource(R.drawable.ic_apps),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(28.dp)
         )
         Text(
             text = category.title,
             style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.Medium,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
@@ -876,12 +989,12 @@ private fun TvUpdatesPage(
         else -> LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 48.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             val activeUpdates = updateMap.entries.toList()
             if (activeUpdates.isNotEmpty()) {
-                item(key = "update_header") {
-                    TvUpdatesHeader(
+                item(key = "update_actions") {
+                    TvUpdateActions(
                         count = activeUpdates.size,
                         fetching = fetchingUpdates,
                         onRefresh = { viewModel.fetchUpdates() },
@@ -896,7 +1009,7 @@ private fun TvUpdatesPage(
                     TvUpdateRow(
                         update = update,
                         download = download,
-                        onClick = { onAppUpdateTarget(update) },
+                        onOpen = { onAppUpdateTarget(update) },
                         onUpdate = { requestUpdate(update) },
                         onCancel = { viewModel.cancelDownload(update.packageName) }
                     )
@@ -915,7 +1028,7 @@ private fun TvUpdatesPage(
                     TvUpdateRow(
                         update = update,
                         download = null,
-                        onClick = { onAppUpdateTarget(update) },
+                        onOpen = { onAppUpdateTarget(update) },
                         onUnignore = { viewModel.unignore(update.packageName) }
                     )
                 }
@@ -925,7 +1038,7 @@ private fun TvUpdatesPage(
 }
 
 @Composable
-private fun TvUpdatesHeader(
+private fun TvUpdateActions(
     count: Int,
     fetching: Boolean,
     onRefresh: () -> Unit,
@@ -941,15 +1054,19 @@ private fun TvUpdatesHeader(
                 if (count == 1) R.string.update_available else R.string.updates_available
             ),
             style = MaterialTheme.typography.headlineSmall,
+            color = MaterialTheme.colorScheme.onBackground,
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.weight(1f)
         )
-        OutlinedButton(onClick = onRefresh, enabled = !fetching) {
-            Text(stringResource(R.string.check_updates))
-        }
-        Button(onClick = onUpdateAll) {
-            Text(stringResource(R.string.action_update_all))
-        }
+        TvActionChip(
+            title = stringResource(R.string.check_updates),
+            enabled = !fetching,
+            onClick = onRefresh
+        )
+        TvActionChip(
+            title = stringResource(R.string.action_update_all),
+            onClick = onUpdateAll
+        )
     }
 }
 
@@ -957,7 +1074,7 @@ private fun TvUpdatesHeader(
 private fun TvUpdateRow(
     update: Update,
     download: Download?,
-    onClick: () -> Unit,
+    onOpen: () -> Unit,
     onUpdate: (() -> Unit)? = null,
     onCancel: (() -> Unit)? = null,
     onUnignore: (() -> Unit)? = null
@@ -969,74 +1086,127 @@ private fun TvUpdateRow(
     } else {
         0f
     }
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(24.dp)
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(112.dp)
-            .tvStandardFocus(
-                shape = shape,
-                normalColor = MaterialTheme.colorScheme.surfaceContainer,
-                focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                focusedScale = 1.015f
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 22.dp),
+            .height(108.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(18.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Box(modifier = Modifier.requiredSize(68.dp)) {
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .tvFocusSurface(
+                    shape = shape,
+                    normalColor = MaterialTheme.colorScheme.surfaceContainer,
+                    focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    focusedScale = 1.015f
+                )
+                .clickable(onClick = onOpen)
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
             AnimatedAppIcon(
                 modifier = Modifier.requiredSize(68.dp),
                 iconUrl = update.iconURL,
                 inProgress = inProgress,
                 progress = progress
             )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text(
+                    text = update.displayName,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = update.developerName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${update.versionName}  ${CommonUtil.addSiPrefix(update.size)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
-        ) {
-            Text(
-                text = update.displayName,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = update.developerName,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Text(
-                text = "${update.versionName}  ${CommonUtil.addSiPrefix(update.size)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
+
         when {
-            onUnignore != null -> OutlinedButton(onClick = onUnignore) {
-                Text(stringResource(R.string.action_unignore))
-            }
+            onUnignore != null -> TvActionChip(
+                title = stringResource(R.string.action_unignore),
+                onClick = onUnignore
+            )
 
-            installing -> OutlinedButton(onClick = {}, enabled = false) {
-                Text(stringResource(R.string.action_installing))
-            }
+            installing -> TvActionChip(
+                title = stringResource(R.string.action_installing),
+                enabled = false,
+                onClick = {}
+            )
 
-            inProgress && onCancel != null -> OutlinedButton(onClick = onCancel) {
-                Text(stringResource(R.string.action_cancel))
-            }
+            inProgress && onCancel != null -> TvActionChip(
+                title = stringResource(R.string.action_cancel),
+                onClick = onCancel
+            )
 
-            onUpdate != null -> Button(onClick = onUpdate) {
-                Text(stringResource(R.string.action_update))
-            }
+            onUpdate != null -> TvActionChip(
+                title = stringResource(R.string.action_update),
+                onClick = onUpdate
+            )
         }
+    }
+}
+
+@Composable
+private fun TvActionChip(title: String, enabled: Boolean = true, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(22.dp)
+    val normalColor = if (enabled) {
+        MaterialTheme.colorScheme.surfaceContainerHigh
+    } else {
+        MaterialTheme.colorScheme.surfaceContainerLow
+    }
+    val contentColor = if (enabled) {
+        MaterialTheme.colorScheme.onSurface
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Row(
+        modifier = Modifier
+            .widthIn(min = 124.dp)
+            .height(50.dp)
+            .tvFocusSurface(
+                shape = shape,
+                normalColor = normalColor,
+                focusedColor = MaterialTheme.colorScheme.primaryContainer,
+                focusedScale = 1.04f
+            )
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 18.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            color = contentColor,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 
@@ -1048,23 +1218,25 @@ private fun TvSectionHeader(title: String, onClick: (() -> Unit)? = null) {
             .then(
                 if (onClick != null) {
                     Modifier
-                        .tvStandardFocus(
-                            shape = RoundedCornerShape(18.dp),
+                        .height(44.dp)
+                        .tvFocusSurface(
+                            shape = RoundedCornerShape(20.dp),
                             normalColor = Color.Transparent,
-                            focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            focusedColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                             focusedScale = 1.01f
                         )
                         .clickable(onClick = onClick)
+                        .padding(horizontal = 8.dp)
                 } else {
-                    Modifier
+                    Modifier.padding(horizontal = 2.dp, vertical = 4.dp)
                 }
-            )
-            .padding(horizontal = 2.dp, vertical = 4.dp),
+            ),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = title,
             style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onBackground,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1082,12 +1254,12 @@ private fun TvSectionHeader(title: String, onClick: (() -> Unit)? = null) {
 
 @Composable
 private fun TvWideAction(title: String, @DrawableRes iconRes: Int, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(24.dp)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(70.dp)
-            .tvStandardFocus(
+            .height(72.dp)
+            .tvFocusSurface(
                 shape = shape,
                 normalColor = MaterialTheme.colorScheme.surfaceContainer,
                 focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -1098,21 +1270,28 @@ private fun TvWideAction(title: String, @DrawableRes iconRes: Int, onClick: () -
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Icon(painter = painterResource(iconRes), contentDescription = null)
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary
+        )
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.SemiBold
         )
     }
 }
 
 @Composable
-private fun TvLoadingBand() {
+private fun TvLoadingPanel(height: androidx.compose.ui.unit.Dp) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(180.dp),
+            .height(height)
+            .clip(RoundedCornerShape(26.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerLow),
         contentAlignment = Alignment.Center
     ) {
         ContainedLoadingIndicator()
