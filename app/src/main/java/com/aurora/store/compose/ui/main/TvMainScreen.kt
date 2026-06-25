@@ -861,7 +861,7 @@ private fun TvAppCard(app: App, onClick: () -> Unit) {
                 shape = shape,
                 normalColor = MaterialTheme.colorScheme.surfaceContainer,
                 focusedColor = MaterialTheme.colorScheme.primaryContainer,
-                focusedScale = 1.025f
+                focusedScale = 1f
             )
             .clickable(onClick = onClick)
             .padding(14.dp),
@@ -903,7 +903,7 @@ private fun TvShowMoreCard(onClick: () -> Unit) {
                 shape = shape,
                 normalColor = MaterialTheme.colorScheme.surfaceContainer,
                 focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                focusedScale = 1.025f
+                focusedScale = 1f
             )
             .clickable(onClick = onClick)
             .padding(20.dp),
@@ -984,7 +984,7 @@ private fun TvCategoryCard(category: Category, onClick: () -> Unit) {
                 shape = shape,
                 normalColor = MaterialTheme.colorScheme.surfaceContainer,
                 focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                focusedScale = 1.025f
+                focusedScale = 1f
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp),

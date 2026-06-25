@@ -58,7 +58,7 @@ fun AppListItem(modifier: Modifier = Modifier, app: App, onClick: () -> Unit = {
         modifier = modifier
             .width(itemWidth)
             .then(if (itemHeight != null) Modifier.height(itemHeight) else Modifier)
-            .tvFocusRing(focusShape, focusedScale = if (isTv) 1.025f else 1f)
+            .tvFocusRing(focusShape)
             .clickable(onClick = onClick)
             .padding(all = dimensionResource(R.dimen.spacing_xsmall)),
         horizontalAlignment = Alignment.CenterHorizontally,
