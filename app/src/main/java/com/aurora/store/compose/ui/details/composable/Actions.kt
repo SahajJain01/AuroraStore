@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
@@ -25,8 +26,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewWrapper
+import androidx.compose.ui.unit.dp
 import com.aurora.extensions.isWindowCompact
 import com.aurora.store.R
+import com.aurora.store.compose.composition.LocalUI
+import com.aurora.store.compose.composition.UI
 import com.aurora.store.compose.preview.ThemePreviewProvider
 
 /**
@@ -46,23 +50,31 @@ fun Actions(
     secondaryActionDisplayName: String,
     isPrimaryActionEnabled: Boolean = true,
     isSecondaryActionEnabled: Boolean = true,
+    primaryActionModifier: Modifier = Modifier,
+    secondaryActionModifier: Modifier = Modifier,
     onPrimaryAction: () -> Unit = {},
     onSecondaryAction: () -> Unit = {},
     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfoV2()
 ) {
+    val isTv = LocalUI.current == UI.TV
+    val horizontalPadding = if (isTv) 0.dp else dimensionResource(R.dimen.spacing_medium)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(PaddingValues(horizontal = dimensionResource(R.dimen.spacing_medium))),
+            .padding(PaddingValues(horizontal = horizontalPadding)),
         horizontalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.spacing_medium))
     ) {
         val buttonWidthModifier = when {
-            windowAdaptiveInfo.isWindowCompact -> Modifier.weight(1F)
+            isTv || windowAdaptiveInfo.isWindowCompact -> Modifier.weight(1F)
             else -> Modifier.widthIn(min = dimensionResource(R.dimen.width_button))
         }
+        val buttonModifier = buttonWidthModifier.then(
+            if (isTv) Modifier.height(56.dp) else Modifier
+        )
 
         FilledTonalButton(
-            modifier = buttonWidthModifier,
+            modifier = buttonModifier.then(secondaryActionModifier),
             onClick = onSecondaryAction,
             enabled = isSecondaryActionEnabled
         ) {
@@ -74,7 +86,7 @@ fun Actions(
         }
 
         Button(
-            modifier = buttonWidthModifier,
+            modifier = buttonModifier.then(primaryActionModifier),
             onClick = onPrimaryAction,
             enabled = isPrimaryActionEnabled
         ) {

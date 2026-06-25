@@ -54,6 +54,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
@@ -131,7 +133,11 @@ import com.aurora.store.util.PackageUtil
 import com.aurora.store.util.ShortcutManagerUtil
 import com.aurora.store.viewmodel.details.AppDetailsViewModel
 import com.jakewharton.processphoenix.ProcessPhoenix
+import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.launch
+
+private val TvDetailsOverscanHorizontal = 58.dp
+private val TvDetailsBottomPadding = 64.dp
 
 @Composable
 fun AppDetailsScreen(
@@ -352,10 +358,18 @@ private fun ScreenContentApp(
         )
     )
     val coroutineScope = rememberCoroutineScope()
+    val primaryActionFocusRequester = remember { FocusRequester() }
     val shouldShowMenuOnMainPane = scaffoldNavigator
         .scaffoldValue[SupportingPaneScaffoldRole.Supporting] == PaneAdaptedValue.Hidden
     var showRestartDialog by remember { mutableStateOf(false) }
     var showAccountPicker by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isTv, state) {
+        if (isTv) {
+            awaitFrame()
+            runCatching { primaryActionFocusRequester.requestFocus() }
+        }
+    }
 
     if (showRestartDialog) {
         ForceRestartDialog(onConfirm = onForceRestart)
@@ -447,6 +461,12 @@ private fun ScreenContentApp(
 
     @Composable
     fun SetupActions() {
+        val primaryActionModifier = if (isTv) {
+            Modifier.focusRequester(primaryActionFocusRequester)
+        } else {
+            Modifier
+        }
+
         AnimatedContent(
             targetState = state,
             contentKey = { it::class },
@@ -461,6 +481,7 @@ private fun ScreenContentApp(
                         primaryActionDisplayName = stringResource(R.string.action_open),
                         secondaryActionDisplayName = stringResource(R.string.action_cancel),
                         isPrimaryActionEnabled = false,
+                        primaryActionModifier = primaryActionModifier,
                         onSecondaryAction = onCancelDownload
                     )
                 }
@@ -471,7 +492,8 @@ private fun ScreenContentApp(
                         primaryActionDisplayName = stringResource(R.string.action_open),
                         secondaryActionDisplayName = stringResource(R.string.action_cancel),
                         isPrimaryActionEnabled = false,
-                        isSecondaryActionEnabled = false
+                        isSecondaryActionEnabled = false,
+                        primaryActionModifier = primaryActionModifier
                     )
                 }
 
@@ -479,6 +501,7 @@ private fun ScreenContentApp(
                     Actions(
                         primaryActionDisplayName = stringResource(R.string.action_update),
                         secondaryActionDisplayName = stringResource(R.string.action_uninstall),
+                        primaryActionModifier = primaryActionModifier,
                         onPrimaryAction = ::onInstall,
                         onSecondaryAction = onUninstall
                     )
@@ -493,7 +516,8 @@ private fun ScreenContentApp(
                         secondaryActionDisplayName = stringResource(R.string.action_uninstall),
                         onPrimaryAction = onOpen,
                         onSecondaryAction = onUninstall,
-                        isPrimaryActionEnabled = canOpen
+                        isPrimaryActionEnabled = canOpen,
+                        primaryActionModifier = primaryActionModifier
                     )
                 }
 
@@ -511,6 +535,7 @@ private fun ScreenContentApp(
                         ),
                         isPrimaryActionEnabled = canAcquire,
                         isSecondaryActionEnabled = canAcquire,
+                        primaryActionModifier = primaryActionModifier,
                         onPrimaryAction = ::onInstall,
                         onSecondaryAction = { showExtraPane(ExtraScreen.ManualDownload) }
                     )
@@ -690,9 +715,9 @@ private fun ScreenContentApp(
                     modifier = Modifier.fillMaxSize(),
                     state = listState,
                     contentPadding = PaddingValues(
-                        start = 24.dp,
-                        end = 24.dp,
-                        bottom = 64.dp
+                        start = TvDetailsOverscanHorizontal,
+                        end = TvDetailsOverscanHorizontal,
+                        bottom = TvDetailsBottomPadding
                     ),
                     verticalArrangement = Arrangement.spacedBy(24.dp)
                 ) {

@@ -107,6 +107,7 @@ import com.aurora.store.viewmodel.all.UpdatesViewModel
 import com.aurora.store.viewmodel.category.CategoryViewModel
 import com.aurora.store.viewmodel.homestream.StreamViewModel
 import com.aurora.store.viewmodel.topchart.TopChartViewModel
+import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
@@ -269,6 +270,7 @@ private fun TvNavigationDrawer(
     )
 
     LaunchedEffect(Unit) {
+        awaitFrame()
         initialFocus.requestFocus()
     }
 
@@ -295,9 +297,7 @@ private fun TvNavigationDrawer(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             TvDrawerLogo(
-                expanded = expanded,
-                contentFocusRequester = contentFocusRequester,
-                onClick = onSearch
+                expanded = expanded
             )
 
             TvDrawerActionItem(
@@ -347,24 +347,11 @@ private fun TvNavigationDrawer(
 }
 
 @Composable
-private fun TvDrawerLogo(
-    expanded: Boolean,
-    contentFocusRequester: FocusRequester,
-    onClick: () -> Unit
-) {
-    val shape = RoundedCornerShape(24.dp)
+private fun TvDrawerLogo(expanded: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .height(60.dp)
-            .focusProperties { right = contentFocusRequester }
-            .tvFocusSurface(
-                shape = shape,
-                normalColor = Color.Transparent,
-                focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                focusedScale = 1.03f
-            )
-            .clickable(onClick = onClick)
             .padding(horizontal = if (expanded) 16.dp else 0.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = if (expanded) Arrangement.spacedBy(14.dp) else Arrangement.Center
@@ -680,7 +667,7 @@ private fun TvBrowsePage(
                 TvAppSection(
                     title = cluster.clusterTitle,
                     apps = displayCluster.apps,
-                    onHeaderClick = if (cluster.clusterBrowseUrl.isNotBlank()) {
+                    onShowAllClick = if (cluster.clusterBrowseUrl.isNotBlank()) {
                         { onHeaderClick(cluster) }
                     } else {
                         null
@@ -813,7 +800,7 @@ private fun TvAppSection(
     title: String,
     apps: List<App>,
     loading: Boolean = false,
-    onHeaderClick: (() -> Unit)? = null,
+    onShowAllClick: (() -> Unit)? = null,
     onAppClick: (App) -> Unit,
     onEndReached: (() -> Unit)? = null
 ) {
@@ -836,7 +823,7 @@ private fun TvAppSection(
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        TvSectionHeader(title = title, onClick = onHeaderClick)
+        TvSectionHeader(title = title)
 
         if (loading && apps.isEmpty()) {
             TvLoadingPanel(height = 196.dp)
@@ -854,6 +841,11 @@ private fun TvAppSection(
             items(count = apps.size, key = { apps[it].packageName }) { index ->
                 TvAppCard(app = apps[index], onClick = { onAppClick(apps[index]) })
             }
+            if (onShowAllClick != null) {
+                item(key = "show_more") {
+                    TvShowMoreCard(onClick = onShowAllClick)
+                }
+            }
         }
     }
 }
@@ -869,7 +861,7 @@ private fun TvAppCard(app: App, onClick: () -> Unit) {
                 shape = shape,
                 normalColor = MaterialTheme.colorScheme.surfaceContainer,
                 focusedColor = MaterialTheme.colorScheme.primaryContainer,
-                focusedScale = 1f
+                focusedScale = 1.025f
             )
             .clickable(onClick = onClick)
             .padding(14.dp),
@@ -894,6 +886,42 @@ private fun TvAppCard(app: App, onClick: () -> Unit) {
             text = buildTvAppMeta(app),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun TvShowMoreCard(onClick: () -> Unit) {
+    val shape = RoundedCornerShape(24.dp)
+    Column(
+        modifier = Modifier
+            .width(TvCardWidth)
+            .height(TvCardHeight)
+            .tvFocusSurface(
+                shape = shape,
+                normalColor = MaterialTheme.colorScheme.surfaceContainer,
+                focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                focusedScale = 1.025f
+            )
+            .clickable(onClick = onClick)
+            .padding(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_arrow_forward),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(42.dp)
+        )
+        Spacer(Modifier.height(14.dp))
+        Text(
+            text = stringResource(R.string.title_more),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
@@ -956,7 +984,7 @@ private fun TvCategoryCard(category: Category, onClick: () -> Unit) {
                 shape = shape,
                 normalColor = MaterialTheme.colorScheme.surfaceContainer,
                 focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                focusedScale = 1f
+                focusedScale = 1.025f
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp),

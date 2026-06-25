@@ -66,6 +66,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.compose.ui.tooling.preview.PreviewWrapper
+import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.paging.LoadState
@@ -246,6 +247,8 @@ private fun ScreenContent(
 
     @Composable
     fun ListPane() {
+        val resultItemEdgePadding = if (isTv) 42.dp else 0.dp
+
         Scaffold(
             topBar = { SearchBar() }
         ) { paddingValues ->
@@ -297,6 +300,9 @@ private fun ScreenContent(
                                     ) { index ->
                                         results[index]?.let { app ->
                                             LargeAppListItem(
+                                                modifier = Modifier.padding(
+                                                    horizontal = resultItemEdgePadding
+                                                ),
                                                 app = app,
                                                 onClick = { showDetailPane(app.packageName) }
                                             )
@@ -357,6 +363,8 @@ private fun FilterHeader(
     onFilter: (filter: SearchFilter) -> Unit
 ) {
     var activeFilter by rememberSaveable { mutableStateOf(SearchFilter()) }
+    val isTv = LocalUI.current == UI.TV
+    val horizontalPadding = if (isTv) 58.dp else dimensionResource(R.dimen.spacing_medium)
 
     val filters = listOfNotNull(
         R.string.action_filter_rating,
@@ -452,7 +460,7 @@ private fun FilterHeader(
     LazyRow(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = dimensionResource(R.dimen.spacing_medium)),
+            .padding(horizontal = horizontalPadding),
         horizontalArrangement = Arrangement.spacedBy(dimensionResource(R.dimen.spacing_medium))
     ) {
         items(items = filters, key = { item -> item }) { filter ->
