@@ -1,3 +1,6 @@
+Fork note:
+This file is the inherited upstream Aurora Store changelog. TV fork-specific changes are tracked in FORK_CHANGELOG.md.
+
 Changelog : v4.8.3 (75)
 • Update microG version
 • Improve app install state handling

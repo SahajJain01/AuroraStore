@@ -1,116 +1,158 @@
-# Aurora Store
+# Aurora Store TV Fork
 
-Aurora Store enables you to search and download apps from the official Google Play store. You can check app descriptions, screenshots, updates, reviews, and download the APK directly from Google Play to your device. 
+> A TV-first fork of Aurora Store focused on Android TV and Google TV devices.
 
-To use Aurora Store, log in using Google Play account, when you first open and configure Aurora Store.
+This repository is a fork of the original [Aurora Store](https://github.com/whyorean/AuroraStore). The fork keeps Aurora Store's Google Play client foundation, but reshapes the application around a 10-foot TV experience: D-pad navigation, large readable layouts, a dark living-room theme, TV-safe spacing, and TV-optimized app discovery.
 
-Unlike a traditional app store, Aurora Store does not own, license or distribute any apps. All apps, app descriptions, screenshots and other content in Aurora Store are directly accessed, downloaded and/or displayed from Google Play. 
+## Why This Fork Exists
 
-Aurora Store works exactly like a door or a browser, allowing you to log in to your Google Play account and find the apps from Google Play. 
+The upstream Aurora Store app works well on phones and tablets, but on many Android TV devices it behaves like a mobile app rotated into landscape. That makes it hard to use with a remote, especially for browsing rows, opening app details, searching, and installing apps from the couch.
 
-*_Please note that Aurora Store does not have any approval, sponsorship or authorization from Google, Google Play, any apps downloaded through Aurora Store or any app developers; neither does Aurora Store have any affiliation, cooperation or connection with them._*
+This fork exists to make Aurora Store practical on TVs.
 
-[<img src="https://f-droid.org/badge/get-it-on.png" alt="Get it on F-Droid" height="90">](https://f-droid.org/packages/com.aurora.store/)
-[<img src="https://gitlab.com/IzzyOnDroid/repo/-/raw/master/assets/IzzyOnDroid.png" alt="Get it on IzzyOnDroid" height="90">](https://apt.izzysoft.de/fdroid/index/apk/com.aurora.store)
+## Fork Goals
 
-## Features
+- Make the TV UI the primary experience for Android TV and Google TV.
+- Keep every important action reachable with a D-pad remote.
+- Prioritize TV-optimized apps in home streams, search results, categories, developer pages, suggestions, and top charts.
+- Use a dark, low-glare visual system suitable for large screens.
+- Follow Google's TV design guidance for focus, layout, overscan-safe spacing, and remote-first navigation.
+- Preserve the upstream Aurora Store foundation where it makes sense, while allowing this fork to move independently for TV-specific UX.
 
-- FOSS: Has GPLv3 licence
-- Beautiful design: Built upon latest Material 3 guidelines
-- Account login: You can login with either personal or an anonymous account
-- Device & Locale spoofing: Change your device and/or locale to access geo locked apps
-- [Exodus Privacy](https://exodus-privacy.eu.org/) integration: Instantly see trackers in app
-- [Plexus](https://plexus.techlore.tech/) integration: Instantly see app compatibility without Google Play Services or with microG
-- Updates blacklisting: Ignore updates for specific apps
-- Download manager
-- Manual downloads: allows you to download older version of apps, provided
-  - The APKs are available with Google
-  - You know the version codes for older versions 
+## Current TV Highlights
+
+- Dedicated `tv` product flavor with `FORCE_TV_UI=true`.
+- Leanback launcher support and a TV banner.
+- Collapsible left navigation rail for Search, Apps, Games, Updates, Downloads, and Settings.
+- TV-specific home screen with hero content, horizontal shelves, passive section headers, and reachable "More" tiles.
+- Fixed-size TV cards with color-based focus states to avoid row jumping.
+- TV-optimized ranking for app lists, search, categories, top charts, developer pages, and suggestions.
+- TV-friendly app details page with a single-pane layout, large actions, screenshot row, dark background, and initial action focus.
+- TV search flow with single-pane results, stable list keys, and first-result focus handoff after search.
+
+See [TV_FORK.md](TV_FORK.md) for implementation scope, quality status, known limitations, and maintenance notes.
+
+## Relationship To Upstream
+
+This is an independent fork. It is not the official Aurora Store project, and it is not affiliated with AuroraOSS, Google, Google Play, or any app developers.
+
+The fork should periodically pull security, API, installer, translation, and bug-fix work from upstream Aurora Store. TV UX changes should remain focused in this fork unless they are generally useful upstream.
+
+## Build The TV App
+
+Prerequisites:
+
+- JDK 21
+- Android SDK with the compile SDK required by the project
+- Android platform tools if you want to install with `adb`
+
+Build a debug TV APK:
+
+```powershell
+$env:ANDROID_HOME='C:\Android\Sdk'
+$env:ANDROID_SDK_ROOT='C:\Android\Sdk'
+.\gradlew.bat :app:assembleTvDebug
+```
+
+The APK is written to:
+
+```text
+app/build/outputs/apk/tv/debug/app-tv-debug.apk
+```
+
+Install it on a connected Android TV device or emulator:
+
+```powershell
+adb install -r app\build\outputs\apk\tv\debug\app-tv-debug.apk
+```
+
+Release builds require the normal Android signing setup used by the upstream project.
+
+## Quality Status
+
+The TV UI has been tested on an Android 9 TV emulator for:
+
+- Launcher entry and TV startup.
+- D-pad navigation across the left rail, hero card, shelves, and "More" tiles.
+- Horizontal shelf stability with no card enlargement on focus.
+- App details layout, action focus, developer-link focus, and screenshot browsing.
+- Search result ranking and focus handoff.
+
+Known caveat: debug/emulator profiling still shows jank during cold startup, app-details load, and row navigation. The UI structure is TV-first, but release profiling on real Android TV hardware is still required before calling the experience fully polished.
+
+## What Aurora Store Does
+
+Aurora Store enables users to search and download apps from the official Google Play store. Users can view app descriptions, screenshots, updates, reviews, and download APKs directly from Google Play to their device.
+
+Unlike a traditional app store, Aurora Store does not own, license, or distribute any apps. Apps, app descriptions, screenshots, and other content shown by Aurora Store are accessed from Google Play.
+
+Please read [DISCLAIMER.md](DISCLAIMER.md) before using this fork with a personal Google account.
+
+## Features Inherited From Aurora Store
+
+- GPLv3-or-later free software.
+- Personal or anonymous account login.
+- Device and locale spoofing.
+- Exodus Privacy integration.
+- Plexus compatibility information.
+- Update blacklisting.
+- Download manager.
+- Manual downloads for available APK versions.
 
 ## Limitations
 
-- The underlying API used is reversed engineered from the Google Play Store, changes on side may break it.
-- Provides only base minimum features
-  - Can not download or update paid apps.
-  - Can not update apps/games with [Play Asset Delivery](https://developer.android.com/guide/playcore/asset-delivery)
-- Multiple in-app features are not available if logged in as Anonymous.
-  - Library
-  - Purchase History
-  - Editor's choice
-  - Beta Programs
-  - Review Add/Update
-- Token dispenser server is not super reliable, downtimes are expected.  
+- The underlying Google Play API is reverse engineered and can break when Google changes behavior.
+- Paid apps cannot be downloaded or updated through anonymous accounts.
+- Apps and games using Play Asset Delivery may not update correctly.
+- Some features are unavailable when logged in anonymously, including library, purchase history, beta programs, and reviews.
+- Token dispenser downtime can affect anonymous login.
+- TV performance still needs real-device profiling and optimization.
 
 ## Downloads
 
-Please only download the latest stable releases from one of these sources:
+This fork does not currently publish an official stable TV release channel. Build the `tv` flavor from source for testing.
 
-- [Official website](https://auroraoss.com/)
+For the official upstream Aurora Store project, use the upstream release sources:
+
+- [AuroraOSS website](https://auroraoss.com/)
 - [GitLab Releases](https://gitlab.com/AuroraOSS/AuroraStore/-/releases)
-- [IzzyOnDroid](https://apt.izzysoft.de/fdroid/index/apk/com.aurora.store) (reproducible)
-- [F-Droid](https://f-droid.org/packages/com.aurora.store/) (signed by F-Droid, [more details](https://f-droid.org/docs/Signing_Process/))
-- [App Gallery](https://appgallery.huawei.com/app/C110907863) (limited to certain countries)
+- [F-Droid](https://f-droid.org/packages/com.aurora.store/)
+- [IzzyOnDroid](https://apt.izzysoft.de/fdroid/index/apk/com.aurora.store)
 
-You can also get latest debug builds signed with AOSP test keys for testing latest changes from our [GitLab Package Registry](https://gitlab.com/AuroraOSS/AuroraStore/-/packages/24103616).
-
-## Certificate Fingerprints
-
-- SHA1: 94:42:75:D7:59:8B:C0:3E:48:85:06:06:42:25:A7:19:90:A2:22:02
-- SHA256: 4C:62:61:57:AD:02:BD:A3:40:1A:72:63:55:5F:68:A7:96:63:FC:3E:13:A4:D4:36:9A:12:57:09:41:AA:28:0F
-
-## Support
-
-Aurora Store v4 is still in on-going development! Bugs are to be expected! Any bug reports are appreciated.
-Please visit [Aurora Wiki](https://gitlab.com/AuroraOSS/AuroraStore/-/wikis/home) for FAQs.
-
-- [Telegram](https://t.me/AuroraSupport)
-- [XDA Developers](https://forum.xda-developers.com/t/app-5-0-aurora-store-open-source-google-play-client.3739733/)
+Those upstream builds are not this TV-focused fork.
 
 ## Permissions
 
-- `android.permission.INTERNET` to download and install/update apps from the Google Play servers
-- `android.permission.ACCESS_NETWORK_STATE` to check internet availability
-- `android.permission.FOREGROUND_SERVICE` to download apps without interruption
-- `android.permission.FOREGROUND_SERVICE_DATA_SYNC` to download apps without interruption
-- `android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` to auto-update apps without interruption (optional)
-- `android.permission.MANAGE_EXTERNAL_STORAGE` to access the OBB directory to download APK expansion files for games or large apps
-- `android.permission.READ_EXTERNAL_STORAGE` to access the OBB directory to download APK expansion files for games or large apps
-- `android.permission.WRITE_EXTERNAL_STORAGE` to access the OBB directory to download APK expansion files for games or large apps
-- `android.permission.QUERY_ALL_PACKAGES` to check updates for all installed apps
-- `android.permission.REQUEST_INSTALL_PACKAGES` to install and update apps
-- `android.permission.REQUEST_DELETE_PACKAGES` to uninstall apps
-- `android.permission.ENFORCE_UPDATE_OWNERSHIP` to silently update apps
-- `android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION` to silently update apps
-- `android.permission.POST_NOTIFICATIONS` to notify user about ongoing downloads, available updates, and errors (optional)
-- `android.permission.USE_CREDENTIALS` to allow users to sign into their personal Google account via microG
+- `android.permission.INTERNET` to download and install or update apps from Google Play servers.
+- `android.permission.ACCESS_NETWORK_STATE` to check internet availability.
+- `android.permission.FOREGROUND_SERVICE` and `android.permission.FOREGROUND_SERVICE_DATA_SYNC` to download apps without interruption.
+- `android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` to support uninterrupted automatic updates.
+- `android.permission.MANAGE_EXTERNAL_STORAGE`, `READ_EXTERNAL_STORAGE`, and `WRITE_EXTERNAL_STORAGE` for OBB expansion files.
+- `android.permission.QUERY_ALL_PACKAGES` to check updates for installed apps.
+- `android.permission.REQUEST_INSTALL_PACKAGES` and `REQUEST_DELETE_PACKAGES` to install, update, and uninstall apps.
+- `android.permission.ENFORCE_UPDATE_OWNERSHIP` and `UPDATE_PACKAGES_WITHOUT_USER_ACTION` for silent update flows where supported.
+- `android.permission.POST_NOTIFICATIONS` for download, update, and error notifications.
+- `android.permission.USE_CREDENTIALS` to allow personal Google account sign-in through microG.
 
-## Screenshots
+## Contributing
 
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/screenshot-01.png" height="400">
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/screenshot-03.png" height="400">
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/screenshot-07.png" height="400">
-<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/screenshot-08.png" height="400">
+This fork welcomes changes that improve Android TV usability, performance, accessibility, and maintainability. Start with [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Translations
+High-value contribution areas:
 
-Don't see your preferred language? Click on the widget below to help translate Aurora Store!
+- Reducing Compose jank and cold-start cost on real TV hardware.
+- Improving D-pad focus behavior and edge cases.
+- Adding TV screenshots and release metadata.
+- Tightening TV app ranking signals.
+- Keeping the fork current with upstream Aurora Store fixes.
 
-<a href="https://hosted.weblate.org/engage/aurora-store/">
-  <img src="https://hosted.weblate.org/widgets/aurora-store/-/287x66-grey.png" alt="Translation status" />
-</a>
+## License
 
-## Donations
+Aurora Store is licensed under GPL-3.0-or-later. This fork keeps the same license. See [LICENSE](LICENSE) and [LICENSES](LICENSES).
 
-You can support Aurora Store's development financially via options below. For more options, checkout the **About** page within the Aurora Store.
+## Project References
 
-[![Liberapay](https://liberapay.com/assets/widgets/donate.svg)](https://liberapay.com/whyorean)
-<a href="https://www.paypal.com/paypalme/AuroraDev">
-  <img src="https://www.paypalobjects.com/webstatic/mktg/logo/AM_mc_vs_dc_ae.jpg" height="45" alt="PayPal">
-</a>
-
-## Project references
-
-Aurora Store is based on these projects
+Aurora Store is based on these projects:
 
 - [YalpStore](https://github.com/yeriomin/YalpStore)
 - [AppCrawler](https://github.com/Akdeniz/google-play-crawler)
