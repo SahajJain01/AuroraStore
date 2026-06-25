@@ -93,6 +93,7 @@ import com.aurora.store.compose.composable.ShimmerCarouselSection
 import com.aurora.store.compose.composable.StreamCarousel
 import com.aurora.store.compose.composable.TopAppBar
 import com.aurora.store.compose.composable.app.AnimatedAppIcon
+import com.aurora.store.compose.composable.tvFocusRing
 import com.aurora.store.compose.composition.LocalUI
 import com.aurora.store.compose.composition.UI
 import com.aurora.store.compose.navigation.Destination
@@ -981,9 +982,10 @@ private fun TvDetailsHero(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    modifier = Modifier.clickable {
-                        onNavigateToDetailsDevProfile(app.developerName)
-                    },
+                    modifier = Modifier
+                        .tvFocusRing(RoundedCornerShape(10.dp))
+                        .clickable { onNavigateToDetailsDevProfile(app.developerName) }
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
                     text = app.developerName,
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,

@@ -902,7 +902,7 @@ private fun TvShowMoreCard(onClick: () -> Unit) {
             .tvFocusSurface(
                 shape = shape,
                 normalColor = MaterialTheme.colorScheme.surfaceContainer,
-                focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                focusedColor = MaterialTheme.colorScheme.primaryContainer,
                 focusedScale = 1f
             )
             .clickable(onClick = onClick)
@@ -983,7 +983,7 @@ private fun TvCategoryCard(category: Category, onClick: () -> Unit) {
             .tvFocusSurface(
                 shape = shape,
                 normalColor = MaterialTheme.colorScheme.surfaceContainer,
-                focusedColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                focusedColor = MaterialTheme.colorScheme.primaryContainer,
                 focusedScale = 1f
             )
             .clickable(onClick = onClick)

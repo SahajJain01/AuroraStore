@@ -91,7 +91,6 @@ import com.aurora.store.compose.ui.details.AppDetailsScreen
 import com.aurora.store.data.model.SearchFilter
 import com.aurora.store.viewmodel.search.SearchViewModel
 import kotlin.random.Random
-import kotlin.uuid.Uuid
 import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -132,7 +131,9 @@ private fun ScreenContent(
     var isSearching by rememberSaveable { mutableStateOf(false) }
 
     val focusRequester = remember { FocusRequester() }
+    val firstResultFocusRequester = remember { FocusRequester() }
     val isTv = LocalUI.current == UI.TV
+    var shouldFocusFirstResult by rememberSaveable { mutableStateOf(false) }
     var scaffoldDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo)
 
     if (isTv) {
@@ -172,6 +173,25 @@ private fun ScreenContent(
         }
         onSearch(textFieldState.text.toString())
         isSearching = true
+        shouldFocusFirstResult = isTv
+    }
+
+    LaunchedEffect(
+        isTv,
+        shouldFocusFirstResult,
+        results.loadState.refresh,
+        results.itemCount
+    ) {
+        if (
+            isTv &&
+            shouldFocusFirstResult &&
+            results.loadState.refresh is LoadState.NotLoading &&
+            results.itemCount > 0
+        ) {
+            awaitFrame()
+            runCatching { firstResultFocusRequester.requestFocus() }
+            shouldFocusFirstResult = false
+        }
     }
 
     @Composable
@@ -296,13 +316,24 @@ private fun ScreenContent(
                                 ) {
                                     items(
                                         count = results.itemCount,
-                                        key = { Uuid.random().toString() }
+                                        key = { index ->
+                                            results.peek(index)?.packageName
+                                                ?: "search-placeholder-$index"
+                                        }
                                     ) { index ->
                                         results[index]?.let { app ->
                                             LargeAppListItem(
-                                                modifier = Modifier.padding(
-                                                    horizontal = resultItemEdgePadding
-                                                ),
+                                                modifier = Modifier
+                                                    .then(
+                                                        if (isTv && index == 0) {
+                                                            Modifier.focusRequester(
+                                                                firstResultFocusRequester
+                                                            )
+                                                        } else {
+                                                            Modifier
+                                                        }
+                                                    )
+                                                    .padding(horizontal = resultItemEdgePadding),
                                                 app = app,
                                                 onClick = { showDetailPane(app.packageName) }
                                             )
